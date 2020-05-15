@@ -1,48 +1,21 @@
-use reqwest::Method;
+use builder::Builder;
 
-pub struct Request {
-    method: Option<Method>,
-    url: String,
-}
+mod builder;
 
-impl Request {
-    pub fn new(url: &str) -> Request {
-        Request {
-            method: None,
-            url: url.to_owned(),
-        }
-    }
-
-    pub fn select(mut self, column_query: &str) -> Request {
-        self.method = Some(Method::GET);
-        self.url.push_str(&format!("?select={}", column_query));
-        self
-    }
-
-    pub async fn execute(self) -> Result<String, Box<dyn std::error::Error>> {
-        let resp = reqwest::get(&self.url)
-            .await?
-            .text()
-            .await?;
-        Ok(resp)
-    }
-}
-
-pub struct PostgrestClient {
+pub struct Postgrest {
     rest_url: String,
 }
 
-impl PostgrestClient {
-    pub fn new(rest_url: &str) -> PostgrestClient {
-        PostgrestClient {
-            rest_url: rest_url.to_owned(),
+impl Postgrest {
+    pub fn new(rest_url: &str) -> Postgrest {
+        Postgrest {
+            rest_url: rest_url.to_string(),
         }
     }
 
-    pub fn from(&self, table: &str) -> Request {
+    pub fn from(&self, table: &str) -> Builder {
         let mut url = self.rest_url.clone();
-        url.push('/');
-        url.push_str(table);
-        Request::new(&url)
+        url = format!("{}/{}", url, table);
+        Builder::new(&url)
     }
 }
