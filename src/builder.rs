@@ -32,29 +32,29 @@ impl Builder {
     // TODO: URL-encoded payload
     pub fn insert(mut self, body: &str) -> Self {
         self.method = Some(Method::POST);
-        self.headers.push(("Prefer".to_string(), "return=representation".to_string()));
+        self.headers
+            .push(("Prefer".to_string(), "return=representation".to_string()));
         self.body = Some(body.to_string());
         self
     }
 
     pub fn update(mut self, body: &str) -> Self {
         self.method = Some(Method::PATCH);
-        self.headers.push(("Prefer".to_string(), "return=representation".to_string()));
+        self.headers
+            .push(("Prefer".to_string(), "return=representation".to_string()));
         self.body = Some(body.to_string());
         self
     }
 
     pub fn delete(mut self) -> Self {
         self.method = Some(Method::DELETE);
-        self.headers.push(("Prefer".to_string(), "return=representation".to_string()));
+        self.headers
+            .push(("Prefer".to_string(), "return=representation".to_string()));
         self
     }
 
     pub async fn execute(self) -> Result<Response, Error> {
-        let mut req = Client::new().request(
-            self.method.unwrap(),
-            &self.url,
-        );
+        let mut req = Client::new().request(self.method.unwrap(), &self.url);
         for (k, v) in &self.headers {
             req = req.header(k, v);
         }
@@ -63,8 +63,7 @@ impl Builder {
             req = req.body(body);
         }
 
-        let resp = req.send()
-           .await?;
+        let resp = req.send().await?;
 
         Ok(resp)
     }
