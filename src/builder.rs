@@ -1,18 +1,34 @@
 use reqwest::{Client, Error, Method, Response};
 
+macro_rules! filter {
+    ( $( $op:ident ),* ) => {
+        $(
+            pub fn $op(mut self, column: &str, param: &str) -> Self {
+                self.queries.push((column.to_string(),
+                                   format!("{}.{}", stringify!($op), param)));
+                self
+            }
+        )*
+    }
+}
+
 pub struct Builder {
-    method: Option<Method>,
+    method: Method,
     url: String,
     queries: Vec<(String, String)>,
     headers: Vec<(String, String)>,
     body: Option<String>,
 }
 
+// TODO: Complex filters (not, and, or)
+// TODO: Switching schema
+// TODO: Exact, planned, estimated count (HEAD verb)
+// TODO: Response format
+// TODO: Embedded resources
 impl Builder {
-    // TODO: Schema
     pub fn new(url: &str) -> Self {
         Builder {
-            method: None,
+            method: Method::GET,
             url: url.to_string(),
             queries: Vec::new(),
             headers: Vec::new(),
@@ -20,26 +36,84 @@ impl Builder {
         }
     }
 
+    // TODO: Multiple columns
+    // TODO: Renaming columns
+    // TODO: Casting columns
+    // TODO: JSON columns
+    // TODO: Computed (virtual) columns
+    // TODO: Investigate character corner cases (Unicode, [ .,:()])
     pub fn select(mut self, column: &str) -> Self {
-        self.method = Some(Method::GET);
-        let column = column.chars().filter(|c| !c.is_whitespace()).collect();
-        self.queries.push(("select".to_string(), column));
+        self.method = Method::GET;
+        self.queries
+            .push(("select".to_string(), column.to_string()));
+        self
+    }
+
+    // TODO: desc/asc
+    // TODO: nullsfirst/nullslast
+    // TODO: Multiple columns
+    // TODO: Computed columns
+    pub fn order(mut self, column: &str) -> Self {
+        self.queries.push(("order".to_string(), column.to_string()));
+        self
+    }
+
+    // TODO: Open-ended range
+    pub fn limit(mut self, count: usize) -> Self {
+        self.headers
+            .push(("Content-Range".to_string(), format!("0-{}", count - 1)));
+        self
+    }
+
+    pub fn single(mut self) -> Self {
+        self.headers.push((
+            "Accept".to_string(),
+            "application/vnd.pgrst.object+json".to_string(),
+        ));
         self
     }
 
     // TODO: Write-only tables
-    // TODO: UPSERT
     // TODO: URL-encoded payload
+    // TODO: Allow specifying columns
     pub fn insert(mut self, body: &str) -> Self {
-        self.method = Some(Method::POST);
+        self.method = Method::POST;
         self.headers
             .push(("Prefer".to_string(), "return=representation".to_string()));
         self.body = Some(body.to_string());
         self
     }
 
+    pub fn insert_csv(mut self, body: &str) -> Self {
+        self.headers
+            .push(("Content-Type".to_string(), "text/csv".to_string()));
+        self.insert(body)
+    }
+
+    // TODO: Allow Prefer: resolution=ignore-duplicates
+    // TODO: on_conflict (make UPSERT work on UNIQUE columns)
+    pub fn upsert(mut self, body: &str) -> Self {
+        self.method = Method::POST;
+        self.headers.push((
+            "Prefer".to_string(),
+            "return=representation; resolution=merge-duplicates".to_string(),
+        ));
+        self.body = Some(body.to_string());
+        self
+    }
+
+    pub fn single_upsert(mut self, primary_column: &str, key: &str, body: &str) -> Self {
+        self.method = Method::PUT;
+        self.headers
+            .push(("Prefer".to_string(), "return=representation".to_string()));
+        self.queries
+            .push((primary_column.to_string(), format!("eq.{}", key)));
+        self.body = Some(body.to_string());
+        self
+    }
+
     pub fn update(mut self, body: &str) -> Self {
-        self.method = Some(Method::PATCH);
+        self.method = Method::PATCH;
         self.headers
             .push(("Prefer".to_string(), "return=representation".to_string()));
         self.body = Some(body.to_string());
@@ -47,14 +121,27 @@ impl Builder {
     }
 
     pub fn delete(mut self) -> Self {
-        self.method = Some(Method::DELETE);
+        self.method = Method::DELETE;
         self.headers
             .push(("Prefer".to_string(), "return=representation".to_string()));
         self
     }
 
+    pub fn in_set(mut self, column: &str, param: &str) -> Self {
+        self.queries
+            .push((column.to_string(), format!("in.{}", param)));
+        self
+    }
+
+    // It's unfortunate that `in` is a keyword, otherwise it'd belong in the
+    // collection of filters below
+    filter!(
+        eq, gt, gte, lt, lte, neq, like, ilike, is, fts, plfts, phfts, wfts, cs, cd, ov, sl, sr,
+        nxr, nxl, adj, not
+    );
+
     pub async fn execute(self) -> Result<Response, Error> {
-        let mut req = Client::new().request(self.method.unwrap(), &self.url);
+        let mut req = Client::new().request(self.method, &self.url);
         for (k, v) in &self.headers {
             req = req.header(k, v);
         }
