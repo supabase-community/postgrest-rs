@@ -9,7 +9,7 @@ pub struct Builder {
 }
 
 impl Builder {
-    // TODO: Schema
+    // TODO: Switching schema
     pub fn new(url: &str) -> Self {
         Builder {
             method: None,
@@ -28,12 +28,39 @@ impl Builder {
     }
 
     // TODO: Write-only tables
-    // TODO: UPSERT
     // TODO: URL-encoded payload
+    // TODO: Allow specifying columns
     pub fn insert(mut self, body: &str) -> Self {
         self.method = Some(Method::POST);
         self.headers
             .push(("Prefer".to_string(), "return=representation".to_string()));
+        self.body = Some(body.to_string());
+        self
+    }
+
+    pub fn insert_csv(mut self, body: &str) -> Self {
+        self.headers
+            .push(("Content-Type".to_string(), "text/csv".to_string()));
+        self.insert(body)
+    }
+
+    // TODO: Allow Prefer: resolution=ignore-duplicates
+    // TODO: on_conflict (make UPSERT work on UNIQUE columns)
+    pub fn upsert(mut self, body: &str) -> Self {
+        self.method = Some(Method::POST);
+        self.headers
+            .push(("Prefer".to_string(),
+                   "return=representation; resolution=merge-duplicates".to_string()));
+        self.body = Some(body.to_string());
+        self
+    }
+
+    pub fn single_upsert(mut self, primary_column: &str, key: &str, body: &str) -> Self {
+        self.method = Some(Method::PUT);
+        self.headers
+            .push(("Prefer".to_string(), "return=representation".to_string()));
+        self.queries.push((primary_column.to_string(),
+                           format!("eq.{}", key)));
         self.body = Some(body.to_string());
         self
     }
