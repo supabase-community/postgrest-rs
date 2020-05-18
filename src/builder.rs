@@ -12,27 +12,29 @@ macro_rules! filter {
     }
 }
 
+#[derive(Default)]
 pub struct Builder {
     method: Method,
     url: String,
+    schema: Option<String>,
     queries: Vec<(String, String)>,
+    // TODO: Maybe change to HeaderMap in the future
     headers: Vec<(String, String)>,
     body: Option<String>,
+    is_rpc: bool,
 }
 
 // TODO: Complex filters (not, and, or)
-// TODO: Switching schema
 // TODO: Exact, planned, estimated count (HEAD verb)
 // TODO: Response format
 // TODO: Embedded resources
 impl Builder {
-    pub fn new(url: &str) -> Self {
+    pub fn new(url: &str, schema: Option<String>) -> Self {
         Builder {
             method: Method::GET,
             url: url.to_string(),
-            queries: Vec::new(),
-            headers: Vec::new(),
-            body: None,
+            schema,
+            ..Default::default()
         }
     }
 
@@ -96,6 +98,7 @@ impl Builder {
         self.method = Method::POST;
         self.headers.push((
             "Prefer".to_string(),
+            // Maybe check if this works as intended...
             "return=representation; resolution=merge-duplicates".to_string(),
         ));
         self.body = Some(body.to_string());
@@ -127,12 +130,6 @@ impl Builder {
         self
     }
 
-    pub fn in_set(mut self, column: &str, param: &str) -> Self {
-        self.queries
-            .push((column.to_string(), format!("in.{}", param)));
-        self
-    }
-
     // It's unfortunate that `in` is a keyword, otherwise it'd belong in the
     // collection of filters below
     filter!(
@@ -140,8 +137,31 @@ impl Builder {
         nxr, nxl, adj, not
     );
 
+    pub fn in_(mut self, column: &str, param: &str) -> Self {
+        self.queries
+            .push((column.to_string(), format!("in.{}", param)));
+        self
+    }
+
+    pub fn rpc(mut self, params: &str) -> Self {
+        self.method = Method::POST;
+        self.body = Some(params.to_string());
+        self.is_rpc = true;
+        self
+    }
+
     pub async fn execute(self) -> Result<Response, Error> {
-        let mut req = Client::new().request(self.method, &self.url);
+        let mut req = Client::new().request(self.method.clone(), &self.url);
+        if let Some(schema) = self.schema {
+            // NOTE: Upstream bug: RPC only works with Accept-Profile
+            // Will change when upstream is fixed
+            let key = if !self.is_rpc || self.method == Method::GET || self.method == Method::HEAD {
+                "Accept-Profile"
+            } else {
+                "Content-Profile"
+            };
+            req = req.header(key, schema);
+        }
         for (k, v) in &self.headers {
             req = req.header(k, v);
         }
