@@ -1,21 +1,32 @@
-use builder::Builder;
-
 mod builder;
 
+use builder::Builder;
+
 pub struct Postgrest {
-    rest_url: String,
+    url: String,
+    schema: Option<String>,
 }
 
 impl Postgrest {
-    pub fn new(rest_url: &str) -> Postgrest {
+    pub fn new(url: &str) -> Self {
         Postgrest {
-            rest_url: rest_url.to_string(),
+            url: url.to_string(),
+            schema: None,
         }
     }
 
+    pub fn schema(mut self, schema: &str) -> Self {
+        self.schema = Some(schema.to_string());
+        self
+    }
+
     pub fn from(&self, table: &str) -> Builder {
-        let mut url = self.rest_url.clone();
-        url = format!("{}/{}", url, table);
-        Builder::new(&url)
+        let url = format!("{}/{}", self.url, table);
+        Builder::new(&url, self.schema.clone())
+    }
+
+    pub fn rpc(&self, function: &str, params: &str) -> Builder {
+        let url = format!("{}/rpc/{}", self.url, function);
+        Builder::new(&url, self.schema.clone()).rpc(params)
     }
 }
