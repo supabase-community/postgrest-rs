@@ -42,6 +42,14 @@ impl Builder {
         }
     }
 
+    pub fn auth(mut self, token: &str) -> Self {
+        self.headers.append(
+            "Authorization",
+            HeaderValue::from_str(&format!("Bearer {}", token)).unwrap(),
+        );
+        self
+    }
+
     // TODO: Multiple columns
     // TODO: Renaming columns
     // TODO: Casting columns
@@ -81,7 +89,7 @@ impl Builder {
     }
 
     pub fn single(mut self) -> Self {
-        self.headers.append(
+        self.headers.insert(
             "Accept",
             HeaderValue::from_static("application/vnd.pgrst.object+json"),
         );
