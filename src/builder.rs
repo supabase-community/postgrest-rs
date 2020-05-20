@@ -1,4 +1,7 @@
-use reqwest::{Client, Error, Method, Response};
+use reqwest::{
+    header::{HeaderMap, HeaderValue},
+    Client, Error, Method, Response,
+};
 
 macro_rules! filter {
     ( $( $op:ident ),* ) => {
@@ -19,7 +22,7 @@ pub struct Builder {
     schema: Option<String>,
     queries: Vec<(String, String)>,
     // TODO: Maybe change to HeaderMap in the future
-    headers: Vec<(String, String)>,
+    headers: HeaderMap,
     body: Option<String>,
     is_rpc: bool,
 }
@@ -34,8 +37,17 @@ impl Builder {
             method: Method::GET,
             url: url.to_string(),
             schema,
+            headers: HeaderMap::new(),
             ..Default::default()
         }
+    }
+
+    pub fn auth(mut self, token: &str) -> Self {
+        self.headers.append(
+            "Authorization",
+            HeaderValue::from_str(&format!("Bearer {}", token)).unwrap(),
+        );
+        self
     }
 
     // TODO: Multiple columns
@@ -60,18 +72,27 @@ impl Builder {
         self
     }
 
-    // TODO: Open-ended range
     pub fn limit(mut self, count: usize) -> Self {
-        self.headers
-            .push(("Content-Range".to_string(), format!("0-{}", count - 1)));
+        self.headers.append(
+            "Content-Range",
+            HeaderValue::from_str(&format!("0-{}", count - 1)).unwrap(),
+        );
+        self
+    }
+
+    pub fn range(mut self, low: usize, high: usize) -> Self {
+        self.headers.append(
+            "Content-Range",
+            HeaderValue::from_str(&format!("{}-{}", low, high)).unwrap(),
+        );
         self
     }
 
     pub fn single(mut self) -> Self {
-        self.headers.push((
-            "Accept".to_string(),
-            "application/vnd.pgrst.object+json".to_string(),
-        ));
+        self.headers.insert(
+            "Accept",
+            HeaderValue::from_static("application/vnd.pgrst.object+json"),
+        );
         self
     }
 
@@ -81,14 +102,14 @@ impl Builder {
     pub fn insert(mut self, body: &str) -> Self {
         self.method = Method::POST;
         self.headers
-            .push(("Prefer".to_string(), "return=representation".to_string()));
+            .append("Prefer", HeaderValue::from_static("return=representation"));
         self.body = Some(body.to_string());
         self
     }
 
     pub fn insert_csv(mut self, body: &str) -> Self {
         self.headers
-            .push(("Content-Type".to_string(), "text/csv".to_string()));
+            .append("Content-Type", HeaderValue::from_static("text/csv"));
         self.insert(body)
     }
 
@@ -96,11 +117,11 @@ impl Builder {
     // TODO: on_conflict (make UPSERT work on UNIQUE columns)
     pub fn upsert(mut self, body: &str) -> Self {
         self.method = Method::POST;
-        self.headers.push((
-            "Prefer".to_string(),
+        self.headers.append(
+            "Prefer",
             // Maybe check if this works as intended...
-            "return=representation; resolution=merge-duplicates".to_string(),
-        ));
+            HeaderValue::from_static("return=representation; resolution=merge-duplicates"),
+        );
         self.body = Some(body.to_string());
         self
     }
@@ -108,7 +129,7 @@ impl Builder {
     pub fn single_upsert(mut self, primary_column: &str, key: &str, body: &str) -> Self {
         self.method = Method::PUT;
         self.headers
-            .push(("Prefer".to_string(), "return=representation".to_string()));
+            .append("Prefer", HeaderValue::from_static("return=representation"));
         self.queries
             .push((primary_column.to_string(), format!("eq.{}", key)));
         self.body = Some(body.to_string());
@@ -118,7 +139,7 @@ impl Builder {
     pub fn update(mut self, body: &str) -> Self {
         self.method = Method::PATCH;
         self.headers
-            .push(("Prefer".to_string(), "return=representation".to_string()));
+            .append("Prefer", HeaderValue::from_static("return=representation"));
         self.body = Some(body.to_string());
         self
     }
@@ -126,7 +147,7 @@ impl Builder {
     pub fn delete(mut self) -> Self {
         self.method = Method::DELETE;
         self.headers
-            .push(("Prefer".to_string(), "return=representation".to_string()));
+            .append("Prefer", HeaderValue::from_static("return=representation"));
         self
     }
 
@@ -150,7 +171,7 @@ impl Builder {
         self
     }
 
-    pub async fn execute(self) -> Result<Response, Error> {
+    pub async fn execute(mut self) -> Result<Response, Error> {
         let mut req = Client::new().request(self.method.clone(), &self.url);
         if let Some(schema) = self.schema {
             // NOTE: Upstream bug: RPC only works with Accept-Profile
@@ -160,12 +181,10 @@ impl Builder {
             } else {
                 "Content-Profile"
             };
-            req = req.header(key, schema);
+            self.headers
+                .append(key, HeaderValue::from_str(&schema).unwrap());
         }
-        for (k, v) in &self.headers {
-            req = req.header(k, v);
-        }
-        req = req.query(&self.queries);
+        req = req.headers(self.headers).query(&self.queries);
         if let Some(body) = self.body {
             req = req.body(body);
         }
