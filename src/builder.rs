@@ -21,7 +21,6 @@ pub struct Builder {
     url: String,
     schema: Option<String>,
     queries: Vec<(String, String)>,
-    // TODO: Maybe change to HeaderMap in the future
     headers: HeaderMap,
     body: Option<String>,
     is_rpc: bool,
