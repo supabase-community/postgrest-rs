@@ -218,7 +218,7 @@ mod tests {
     fn auth_with_token() {
         let builder = Builder::new(TABLE_URL, None).auth("$Up3rS3crET");
         assert_eq!(
-            builder.headers.get("Authentication").unwrap(),
+            builder.headers.get("Authorization").unwrap(),
             HeaderValue::from_static("Bearer $Up3rS3crET")
         );
     }
