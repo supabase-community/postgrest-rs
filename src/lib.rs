@@ -30,3 +30,23 @@ impl Postgrest {
         Builder::new(&url, self.schema.clone()).rpc(params)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const REST_URL: &str = "https://localhost:3000";
+
+    #[test]
+    fn initialize() {
+        assert_eq!(Postgrest::new(REST_URL).url, REST_URL);
+    }
+
+    #[test]
+    fn switch_schema() {
+        assert_eq!(
+            Postgrest::new(REST_URL).schema("private").schema,
+            Some("private".to_string())
+        );
+    }
+}
