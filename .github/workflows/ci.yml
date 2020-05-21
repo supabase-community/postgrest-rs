@@ -12,7 +12,8 @@ jobs:
   test:
     strategy:
       matrix:
-        platform: [ubuntu-latest, macos-latest, windows-latest]
+        # macos-latest doesn't have docker-compose, no manifest for windows-latest
+        platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
 
     steps:
