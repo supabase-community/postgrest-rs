@@ -1,4 +1,5 @@
 mod builder;
+mod filter;
 
 use builder::Builder;
 
@@ -8,26 +9,39 @@ pub struct Postgrest {
 }
 
 impl Postgrest {
-    pub fn new(url: &str) -> Self {
+    pub fn new<T>(url: T) -> Self
+    where
+        T: Into<String>,
+    {
         Postgrest {
-            url: url.to_string(),
+            url: url.into(),
             schema: None,
         }
     }
 
-    pub fn schema(mut self, schema: &str) -> Self {
-        self.schema = Some(schema.to_string());
+    pub fn schema<T>(mut self, schema: T) -> Self
+    where
+        T: Into<String>,
+    {
+        self.schema = Some(schema.into());
         self
     }
 
-    pub fn from(&self, table: &str) -> Builder {
-        let url = format!("{}/{}", self.url, table);
-        Builder::new(&url, self.schema.clone())
+    pub fn from<T>(&self, table: T) -> Builder
+    where
+        T: Into<String>,
+    {
+        let url = format!("{}/{}", self.url, table.into());
+        Builder::new(url, self.schema.clone())
     }
 
-    pub fn rpc(&self, function: &str, params: &str) -> Builder {
-        let url = format!("{}/rpc/{}", self.url, function);
-        Builder::new(&url, self.schema.clone()).rpc(params)
+    pub fn rpc<T, U>(&self, function: T, params: U) -> Builder
+    where
+        T: Into<String>,
+        U: Into<String>,
+    {
+        let url = format!("{}/rpc/{}", self.url, function.into());
+        Builder::new(url, self.schema.clone()).rpc(params)
     }
 }
 

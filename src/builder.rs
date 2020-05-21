@@ -1,26 +1,16 @@
+extern crate reqwest;
+
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client, Error, Method, Response,
 };
-
-macro_rules! filter {
-    ( $( $op:ident ),* ) => {
-        $(
-            pub fn $op(mut self, column: &str, param: &str) -> Self {
-                self.queries.push((column.to_string(),
-                                   format!("{}.{}", stringify!($op), param)));
-                self
-            }
-        )*
-    }
-}
 
 #[derive(Default)]
 pub struct Builder {
     method: Method,
     url: String,
     schema: Option<String>,
-    queries: Vec<(String, String)>,
+    pub(crate) queries: Vec<(String, String)>,
     headers: HeaderMap,
     body: Option<String>,
     is_rpc: bool,
@@ -30,21 +20,32 @@ pub struct Builder {
 // TODO: Exact, planned, estimated count (HEAD verb)
 // TODO: Response format
 // TODO: Embedded resources
+// TODO: Content type (csv, etc.)
 impl Builder {
-    pub fn new(url: &str, schema: Option<String>) -> Self {
-        Builder {
+    pub fn new<S>(url: S, schema: Option<String>) -> Self
+    where
+        S: Into<String>,
+    {
+        let mut builder = Builder {
             method: Method::GET,
-            url: url.to_string(),
+            url: url.into(),
             schema,
             headers: HeaderMap::new(),
             ..Default::default()
-        }
+        };
+        builder
+            .headers
+            .insert("Accept", HeaderValue::from_static("application/json"));
+        builder
     }
 
-    pub fn auth(mut self, token: &str) -> Self {
+    pub fn auth<S>(mut self, token: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.headers.append(
             "Authorization",
-            HeaderValue::from_str(&format!("Bearer {}", token)).unwrap(),
+            HeaderValue::from_str(&format!("Bearer {}", token.into())).unwrap(),
         );
         self
     }
@@ -55,10 +56,12 @@ impl Builder {
     // TODO: JSON columns
     // TODO: Computed (virtual) columns
     // TODO: Investigate character corner cases (Unicode, [ .,:()])
-    pub fn select(mut self, column: &str) -> Self {
+    pub fn select<S>(mut self, column: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::GET;
-        self.queries
-            .push(("select".to_string(), column.to_string()));
+        self.queries.push(("select".to_string(), column.into()));
         self
     }
 
@@ -66,22 +69,29 @@ impl Builder {
     // TODO: nullsfirst/nullslast
     // TODO: Multiple columns
     // TODO: Computed columns
-    pub fn order(mut self, column: &str) -> Self {
-        self.queries.push(("order".to_string(), column.to_string()));
+    pub fn order<S>(mut self, column: S) -> Self
+    where
+        S: Into<String>,
+    {
+        self.queries.push(("order".to_string(), column.into()));
         self
     }
 
     pub fn limit(mut self, count: usize) -> Self {
-        self.headers.append(
-            "Content-Range",
+        self.headers
+            .insert("Range-Unit", HeaderValue::from_static("items"));
+        self.headers.insert(
+            "Range",
             HeaderValue::from_str(&format!("0-{}", count - 1)).unwrap(),
         );
         self
     }
 
     pub fn range(mut self, low: usize, high: usize) -> Self {
-        self.headers.append(
-            "Content-Range",
+        self.headers
+            .insert("Range-Unit", HeaderValue::from_static("items"));
+        self.headers.insert(
+            "Range",
             HeaderValue::from_str(&format!("{}-{}", low, high)).unwrap(),
         );
         self
@@ -98,48 +108,56 @@ impl Builder {
     // TODO: Write-only tables
     // TODO: URL-encoded payload
     // TODO: Allow specifying columns
-    pub fn insert(mut self, body: &str) -> Self {
+    pub fn insert<S>(mut self, body: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::POST;
         self.headers
-            .append("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.to_string());
+            .insert("Prefer", HeaderValue::from_static("return=representation"));
+        self.body = Some(body.into());
         self
-    }
-
-    pub fn insert_csv(mut self, body: &str) -> Self {
-        self.headers
-            .append("Content-Type", HeaderValue::from_static("text/csv"));
-        self.insert(body)
     }
 
     // TODO: Allow Prefer: resolution=ignore-duplicates
     // TODO: on_conflict (make UPSERT work on UNIQUE columns)
-    pub fn upsert(mut self, body: &str) -> Self {
+    pub fn upsert<S>(mut self, body: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::POST;
         self.headers.append(
             "Prefer",
             // Maybe check if this works as intended...
             HeaderValue::from_static("return=representation; resolution=merge-duplicates"),
         );
-        self.body = Some(body.to_string());
+        self.body = Some(body.into());
         self
     }
 
-    pub fn single_upsert(mut self, primary_column: &str, key: &str, body: &str) -> Self {
+    pub fn single_upsert<S, T, U>(mut self, primary_column: S, key: T, body: U) -> Self
+    where
+        S: Into<String>,
+        T: Into<String>,
+        U: Into<String>,
+    {
         self.method = Method::PUT;
         self.headers
             .append("Prefer", HeaderValue::from_static("return=representation"));
         self.queries
-            .push((primary_column.to_string(), format!("eq.{}", key)));
-        self.body = Some(body.to_string());
+            .push((primary_column.into(), format!("eq.{}", key.into())));
+        self.body = Some(body.into());
         self
     }
 
-    pub fn update(mut self, body: &str) -> Self {
+    pub fn update<S>(mut self, body: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::PATCH;
         self.headers
             .append("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.to_string());
+        self.body = Some(body.into());
         self
     }
 
@@ -150,22 +168,12 @@ impl Builder {
         self
     }
 
-    // It's unfortunate that `in` is a keyword, otherwise it'd belong in the
-    // collection of filters below
-    filter!(
-        eq, gt, gte, lt, lte, neq, like, ilike, is, fts, plfts, phfts, wfts, cs, cd, ov, sl, sr,
-        nxr, nxl, adj, not
-    );
-
-    pub fn in_(mut self, column: &str, param: &str) -> Self {
-        self.queries
-            .push((column.to_string(), format!("in.{}", param)));
-        self
-    }
-
-    pub fn rpc(mut self, params: &str) -> Self {
+    pub fn rpc<S>(mut self, params: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::POST;
-        self.body = Some(params.to_string());
+        self.body = Some(params.into());
         self.is_rpc = true;
         self
     }
@@ -173,9 +181,7 @@ impl Builder {
     pub async fn execute(mut self) -> Result<Response, Error> {
         let mut req = Client::new().request(self.method.clone(), &self.url);
         if let Some(schema) = self.schema {
-            // NOTE: Upstream bug: RPC only works with Accept-Profile
-            // Will change when upstream is fixed
-            let key = if !self.is_rpc || self.method == Method::GET || self.method == Method::HEAD {
+            let key = if self.method == Method::GET || self.method == Method::HEAD {
                 "Accept-Profile"
             } else {
                 "Content-Profile"
@@ -188,8 +194,113 @@ impl Builder {
             req = req.body(body);
         }
 
-        let resp = req.send().await?;
+        req.send().await
+    }
+}
 
-        Ok(resp)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TABLE_URL: &str = "http://localhost:3000/table";
+    const RPC_URL: &str = "http://localhost/rpc";
+
+    #[test]
+    fn only_accept_json() {
+        let builder = Builder::new(TABLE_URL, None);
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            HeaderValue::from_static("application/json")
+        );
+    }
+
+    #[test]
+    fn auth_with_token() {
+        let builder = Builder::new(TABLE_URL, None).auth("$Up3rS3crET");
+        assert_eq!(
+            builder.headers.get("Authorization").unwrap(),
+            HeaderValue::from_static("Bearer $Up3rS3crET")
+        );
+    }
+
+    #[test]
+    fn select_assert_query() {
+        let builder = Builder::new(TABLE_URL, None).select("some_table");
+        assert_eq!(builder.method, Method::GET);
+        assert_eq!(
+            builder
+                .queries
+                .contains(&("select".to_string(), "some_table".to_string())),
+            true
+        );
+    }
+
+    #[test]
+    fn order_assert_query() {
+        let builder = Builder::new(TABLE_URL, None).order("id");
+        assert_eq!(
+            builder
+                .queries
+                .contains(&("order".to_string(), "id".to_string())),
+            true
+        );
+    }
+
+    #[test]
+    fn limit_assert_range_header() {
+        let builder = Builder::new(TABLE_URL, None).limit(20);
+        assert_eq!(
+            builder.headers.get("Range").unwrap(),
+            HeaderValue::from_static("0-19")
+        );
+    }
+
+    #[test]
+    fn range_assert_range_header() {
+        let builder = Builder::new(TABLE_URL, None).range(10, 20);
+        assert_eq!(
+            builder.headers.get("Range").unwrap(),
+            HeaderValue::from_static("10-20")
+        );
+    }
+
+    #[test]
+    fn single_assert_accept_header() {
+        let builder = Builder::new(TABLE_URL, None).single();
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            HeaderValue::from_static("application/vnd.pgrst.object+json")
+        );
+    }
+
+    #[test]
+    fn upsert_assert_prefer_header() {
+        let builder = Builder::new(TABLE_URL, None).upsert("ignored");
+        assert_eq!(
+            builder.headers.get("Prefer").unwrap(),
+            HeaderValue::from_static("return=representation; resolution=merge-duplicates")
+        );
+    }
+
+    #[test]
+    fn single_upsert_assert_prefer_header() {
+        let builder = Builder::new(TABLE_URL, None).single_upsert("ignored", "ignored", "ignored");
+        assert_eq!(
+            builder.headers.get("Prefer").unwrap(),
+            HeaderValue::from_static("return=representation")
+        );
+    }
+
+    #[test]
+    fn not_rpc_should_not_have_flag() {
+        let builder = Builder::new(TABLE_URL, None).select("ignored");
+        assert_eq!(builder.is_rpc, false);
+    }
+
+    #[test]
+    fn rpc_should_have_body_and_flag() {
+        let builder = Builder::new(RPC_URL, None).rpc("{\"a\": 1, \"b\": 2}");
+        assert_eq!(builder.body.unwrap(), "{\"a\": 1, \"b\": 2}");
+        assert_eq!(builder.is_rpc, true);
     }
 }
