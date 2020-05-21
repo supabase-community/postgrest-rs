@@ -20,11 +20,15 @@ pub struct Builder {
 // TODO: Exact, planned, estimated count (HEAD verb)
 // TODO: Response format
 // TODO: Embedded resources
+// TODO: Content type (csv, etc.)
 impl Builder {
-    pub fn new(url: &str, schema: Option<String>) -> Self {
+    pub fn new<S>(url: S, schema: Option<String>) -> Self
+    where
+        S: Into<String>,
+    {
         let mut builder = Builder {
             method: Method::GET,
-            url: url.to_string(),
+            url: url.into(),
             schema,
             headers: HeaderMap::new(),
             ..Default::default()
@@ -35,10 +39,13 @@ impl Builder {
         builder
     }
 
-    pub fn auth(mut self, token: &str) -> Self {
+    pub fn auth<S>(mut self, token: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.headers.append(
             "Authorization",
-            HeaderValue::from_str(&format!("Bearer {}", token)).unwrap(),
+            HeaderValue::from_str(&format!("Bearer {}", token.into())).unwrap(),
         );
         self
     }
@@ -49,10 +56,12 @@ impl Builder {
     // TODO: JSON columns
     // TODO: Computed (virtual) columns
     // TODO: Investigate character corner cases (Unicode, [ .,:()])
-    pub fn select(mut self, column: &str) -> Self {
+    pub fn select<S>(mut self, column: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::GET;
-        self.queries
-            .push(("select".to_string(), column.to_string()));
+        self.queries.push(("select".to_string(), column.into()));
         self
     }
 
@@ -60,8 +69,11 @@ impl Builder {
     // TODO: nullsfirst/nullslast
     // TODO: Multiple columns
     // TODO: Computed columns
-    pub fn order(mut self, column: &str) -> Self {
-        self.queries.push(("order".to_string(), column.to_string()));
+    pub fn order<S>(mut self, column: S) -> Self
+    where
+        S: Into<String>,
+    {
+        self.queries.push(("order".to_string(), column.into()));
         self
     }
 
@@ -96,48 +108,56 @@ impl Builder {
     // TODO: Write-only tables
     // TODO: URL-encoded payload
     // TODO: Allow specifying columns
-    pub fn insert(mut self, body: &str) -> Self {
+    pub fn insert<S>(mut self, body: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::POST;
         self.headers
             .insert("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.to_string());
+        self.body = Some(body.into());
         self
-    }
-
-    pub fn insert_csv(mut self, body: &str) -> Self {
-        self.headers
-            .insert("Content-Type", HeaderValue::from_static("text/csv"));
-        self.insert(body)
     }
 
     // TODO: Allow Prefer: resolution=ignore-duplicates
     // TODO: on_conflict (make UPSERT work on UNIQUE columns)
-    pub fn upsert(mut self, body: &str) -> Self {
+    pub fn upsert<S>(mut self, body: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::POST;
         self.headers.append(
             "Prefer",
             // Maybe check if this works as intended...
             HeaderValue::from_static("return=representation; resolution=merge-duplicates"),
         );
-        self.body = Some(body.to_string());
+        self.body = Some(body.into());
         self
     }
 
-    pub fn single_upsert(mut self, primary_column: &str, key: &str, body: &str) -> Self {
+    pub fn single_upsert<S, T, U>(mut self, primary_column: S, key: T, body: U) -> Self
+    where
+        S: Into<String>,
+        T: Into<String>,
+        U: Into<String>,
+    {
         self.method = Method::PUT;
         self.headers
             .append("Prefer", HeaderValue::from_static("return=representation"));
         self.queries
-            .push((primary_column.to_string(), format!("eq.{}", key)));
-        self.body = Some(body.to_string());
+            .push((primary_column.into(), format!("eq.{}", key.into())));
+        self.body = Some(body.into());
         self
     }
 
-    pub fn update(mut self, body: &str) -> Self {
+    pub fn update<S>(mut self, body: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::PATCH;
         self.headers
             .append("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.to_string());
+        self.body = Some(body.into());
         self
     }
 
@@ -148,9 +168,12 @@ impl Builder {
         self
     }
 
-    pub fn rpc(mut self, params: &str) -> Self {
+    pub fn rpc<S>(mut self, params: S) -> Self
+    where
+        S: Into<String>,
+    {
         self.method = Method::POST;
-        self.body = Some(params.to_string());
+        self.body = Some(params.into());
         self.is_rpc = true;
         self
     }
@@ -178,14 +201,13 @@ impl Builder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Postgrest;
 
-    const REST_URL: &str = "http://localhost:3000";
+    const TABLE_URL: &str = "http://localhost:3000/table";
+    const RPC_URL: &str = "http://localhost/rpc";
 
     #[test]
     fn only_accept_json() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users");
+        let builder = Builder::new(TABLE_URL, None);
         assert_eq!(
             builder.headers.get("Accept").unwrap(),
             HeaderValue::from_static("application/json")
@@ -194,8 +216,7 @@ mod tests {
 
     #[test]
     fn auth_with_token() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").auth("$Up3rS3crET");
+        let builder = Builder::new(TABLE_URL, None).auth("$Up3rS3crET");
         assert_eq!(
             builder.headers.get("Authentication").unwrap(),
             HeaderValue::from_static("Bearer $Up3rS3crET")
@@ -204,8 +225,7 @@ mod tests {
 
     #[test]
     fn select_assert_query() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").select("some_table");
+        let builder = Builder::new(TABLE_URL, None).select("some_table");
         assert_eq!(builder.method, Method::GET);
         assert_eq!(
             builder
@@ -217,8 +237,7 @@ mod tests {
 
     #[test]
     fn order_assert_query() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").order("id");
+        let builder = Builder::new(TABLE_URL, None).order("id");
         assert_eq!(
             builder
                 .queries
@@ -229,8 +248,7 @@ mod tests {
 
     #[test]
     fn limit_assert_range_header() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").limit(20);
+        let builder = Builder::new(TABLE_URL, None).limit(20);
         assert_eq!(
             builder.headers.get("Range").unwrap(),
             HeaderValue::from_static("0-19")
@@ -239,8 +257,7 @@ mod tests {
 
     #[test]
     fn range_assert_range_header() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").range(10, 20);
+        let builder = Builder::new(TABLE_URL, None).range(10, 20);
         assert_eq!(
             builder.headers.get("Range").unwrap(),
             HeaderValue::from_static("10-20")
@@ -249,8 +266,7 @@ mod tests {
 
     #[test]
     fn single_assert_accept_header() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").single();
+        let builder = Builder::new(TABLE_URL, None).single();
         assert_eq!(
             builder.headers.get("Accept").unwrap(),
             HeaderValue::from_static("application/vnd.pgrst.object+json")
@@ -258,19 +274,8 @@ mod tests {
     }
 
     #[test]
-    fn insert_csv_assert_content_type() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").insert_csv("ignored");
-        assert_eq!(
-            builder.headers.get("Content-Type").unwrap(),
-            HeaderValue::from_static("text/csv")
-        );
-    }
-
-    #[test]
     fn upsert_assert_prefer_header() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").upsert("ignored");
+        let builder = Builder::new(TABLE_URL, None).upsert("ignored");
         assert_eq!(
             builder.headers.get("Prefer").unwrap(),
             HeaderValue::from_static("return=representation; resolution=merge-duplicates")
@@ -279,29 +284,22 @@ mod tests {
 
     #[test]
     fn single_upsert_assert_prefer_header() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client
-            .from("users")
-            .single_upsert("ignored", "ignored", "ignored");
+        let builder = Builder::new(TABLE_URL, None).single_upsert("ignored", "ignored", "ignored");
         assert_eq!(
             builder.headers.get("Prefer").unwrap(),
             HeaderValue::from_static("return=representation")
         );
     }
 
-    // filters...
-
     #[test]
     fn not_rpc_should_not_have_flag() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").select("column");
+        let builder = Builder::new(TABLE_URL, None).select("ignored");
         assert_eq!(builder.is_rpc, false);
     }
 
     #[test]
     fn rpc_should_have_body_and_flag() {
-        let client = Postgrest::new(REST_URL);
-        let builder = client.from("users").rpc("{\"a\": 1, \"b\": 2}");
+        let builder = Builder::new(RPC_URL, None).rpc("{\"a\": 1, \"b\": 2}");
         assert_eq!(builder.body.unwrap(), "{\"a\": 1, \"b\": 2}");
         assert_eq!(builder.is_rpc, true);
     }
