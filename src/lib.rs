@@ -1,4 +1,5 @@
 mod builder;
+mod filter;
 
 use builder::Builder;
 
