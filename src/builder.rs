@@ -175,5 +175,134 @@ impl Builder {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Postgrest;
+
+    const REST_URL: &str = "http://localhost:3000";
+
+    #[test]
+    fn only_accept_json() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users");
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            HeaderValue::from_static("application/json")
+        );
+    }
+
+    #[test]
+    fn auth_with_token() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").auth("$Up3rS3crET");
+        assert_eq!(
+            builder.headers.get("Authentication").unwrap(),
+            HeaderValue::from_static("Bearer $Up3rS3crET")
+        );
+    }
+
+    #[test]
+    fn select_assert_query() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").select("some_table");
+        assert_eq!(builder.method, Method::GET);
+        assert_eq!(
+            builder
+                .queries
+                .contains(&("select".to_string(), "some_table".to_string())),
+            true
+        );
+    }
+
+    #[test]
+    fn order_assert_query() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").order("id");
+        assert_eq!(
+            builder
+                .queries
+                .contains(&("order".to_string(), "id".to_string())),
+            true
+        );
+    }
+
+    #[test]
+    fn limit_assert_range_header() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").limit(20);
+        assert_eq!(
+            builder.headers.get("Range").unwrap(),
+            HeaderValue::from_static("0-19")
+        );
+    }
+
+    #[test]
+    fn range_assert_range_header() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").range(10, 20);
+        assert_eq!(
+            builder.headers.get("Range").unwrap(),
+            HeaderValue::from_static("10-20")
+        );
+    }
+
+    #[test]
+    fn single_assert_accept_header() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").single();
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            HeaderValue::from_static("application/vnd.pgrst.object+json")
+        );
+    }
+
+    #[test]
+    fn insert_csv_assert_content_type() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").insert_csv("ignored");
+        assert_eq!(
+            builder.headers.get("Content-Type").unwrap(),
+            HeaderValue::from_static("text/csv")
+        );
+    }
+
+    #[test]
+    fn upsert_assert_prefer_header() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").upsert("ignored");
+        assert_eq!(
+            builder.headers.get("Prefer").unwrap(),
+            HeaderValue::from_static("return=representation; resolution=merge-duplicates")
+        );
+    }
+
+    #[test]
+    fn single_upsert_assert_prefer_header() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client
+            .from("users")
+            .single_upsert("ignored", "ignored", "ignored");
+        assert_eq!(
+            builder.headers.get("Prefer").unwrap(),
+            HeaderValue::from_static("return=representation")
+        );
+    }
+
+    // filters...
+
+    #[test]
+    fn not_rpc_should_not_have_flag() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").select("column");
+        assert_eq!(builder.is_rpc, false);
+    }
+
+    #[test]
+    fn rpc_should_have_body_and_flag() {
+        let client = Postgrest::new(REST_URL);
+        let builder = client.from("users").rpc("{\"a\": 1, \"b\": 2}");
+        assert_eq!(builder.body.unwrap(), "{\"a\": 1, \"b\": 2}");
+        assert_eq!(builder.is_rpc, true);
     }
 }
