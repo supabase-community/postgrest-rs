@@ -1,3 +1,5 @@
+extern crate reqwest;
+
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client, Error, Method, Response,
@@ -20,13 +22,17 @@ pub struct Builder {
 // TODO: Embedded resources
 impl Builder {
     pub fn new(url: &str, schema: Option<String>) -> Self {
-        Builder {
+        let mut builder = Builder {
             method: Method::GET,
             url: url.to_string(),
             schema,
             headers: HeaderMap::new(),
             ..Default::default()
-        }
+        };
+        builder
+            .headers
+            .insert("Accept", HeaderValue::from_static("application/json"));
+        builder
     }
 
     pub fn auth(mut self, token: &str) -> Self {
@@ -60,16 +66,20 @@ impl Builder {
     }
 
     pub fn limit(mut self, count: usize) -> Self {
-        self.headers.append(
-            "Content-Range",
+        self.headers
+            .insert("Range-Unit", HeaderValue::from_static("items"));
+        self.headers.insert(
+            "Range",
             HeaderValue::from_str(&format!("0-{}", count - 1)).unwrap(),
         );
         self
     }
 
     pub fn range(mut self, low: usize, high: usize) -> Self {
-        self.headers.append(
-            "Content-Range",
+        self.headers
+            .insert("Range-Unit", HeaderValue::from_static("items"));
+        self.headers.insert(
+            "Range",
             HeaderValue::from_str(&format!("{}-{}", low, high)).unwrap(),
         );
         self
@@ -89,14 +99,14 @@ impl Builder {
     pub fn insert(mut self, body: &str) -> Self {
         self.method = Method::POST;
         self.headers
-            .append("Prefer", HeaderValue::from_static("return=representation"));
+            .insert("Prefer", HeaderValue::from_static("return=representation"));
         self.body = Some(body.to_string());
         self
     }
 
     pub fn insert_csv(mut self, body: &str) -> Self {
         self.headers
-            .append("Content-Type", HeaderValue::from_static("text/csv"));
+            .insert("Content-Type", HeaderValue::from_static("text/csv"));
         self.insert(body)
     }
 
@@ -148,9 +158,7 @@ impl Builder {
     pub async fn execute(mut self) -> Result<Response, Error> {
         let mut req = Client::new().request(self.method.clone(), &self.url);
         if let Some(schema) = self.schema {
-            // NOTE: Upstream bug: RPC only works with Accept-Profile
-            // Will change when upstream is fixed
-            let key = if !self.is_rpc || self.method == Method::GET || self.method == Method::HEAD {
+            let key = if self.method == Method::GET || self.method == Method::HEAD {
                 "Accept-Profile"
             } else {
                 "Content-Profile"
@@ -163,8 +171,9 @@ impl Builder {
             req = req.body(body);
         }
 
-        let resp = req.send().await?;
+        req.send().await
+    }
+}
 
-        Ok(resp)
     }
 }
