@@ -1,3 +1,63 @@
+//! # postgrest-rs
+//!
+//! [PostgREST](https://postgrest.org) client-side library.
+//!
+//! This library brings an ORM-like interface to PostgREST.
+//!
+//! ## Usage
+//!
+//! Simple example:
+//! ```rust,no_run
+//! use postgrest::Postgrest;
+//!
+//! let client = Postgrest::new("https://your-postgrest-endpoint");
+//! let resp = client
+//!     .from("your_table")
+//!     .select("*")
+//!     .execute()
+//!     .await?;
+//! let body = resp
+//!     .text()
+//!     .await();
+//! ```
+//!
+//! Using filters:
+//! ```rust,no_run
+//! # use postgrest::Postgrest;
+//! # let client = Postgrest::new("https://your-postgrest-endpoint");
+//! let resp = client
+//!     .from("your_table")
+//!     .eq("country", "Germany")
+//!     .gte("id", "20")
+//!     .select("*")
+//!     .execute()
+//!     .await?;
+//! ```
+//!
+//! Updating a table:
+//! ```rust,no_run
+//! # use postgrest::Postgrest;
+//! # let client = Postgrest::new("https://your-postgrest-endpoint");
+//! let resp = client
+//!     .from("your_table")
+//!     .eq("username", "soedirgo")
+//!     .update("{\"organization\": \"supabase\"}")
+//!     .execute()
+//!     .await?;
+//! ```
+//!
+//! Executing stored procedures:
+//! ```rust,no_run
+//! # use postgrest::Postgrest;
+//! # let client = Postgrest::new("https://your-postgrest-endpoint");
+//! let resp = client
+//!     .rpc("add", "{\"a\": 1, \"b\": 2}")
+//!     .execute()
+//!     .await?;
+//! ```
+//!
+//! Check out the [README](https://github.com/supabase/postgrest-rs) for more examples.
+
 extern crate reqwest;
 
 mod builder;
