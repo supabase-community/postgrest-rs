@@ -42,19 +42,19 @@ async fn write_other_schema() -> Result<(), Box<dyn Error>> {
     let resp = client
         .from("users")
         .select("status")
-        .eq("username", "dragarcia")
+        .eq("username", "supabot")
         .execute()
         .await?;
     let body = resp.text().await?;
     let body = json::parse(&body)?;
 
-    assert_eq!(body[0]["status"], "OFFLINE");
+    assert_eq!(body[0]["status"], "ONLINE");
 
     let other_client = Postgrest::new(REST_URL).schema("personal");
     let other_resp = other_client
         .from("users")
         .update("{\"status\": \"OFFLINE\"}")
-        .eq("username", "dragarcia")
+        .eq("username", "supabot")
         .execute()
         .await?;
     let other_body = other_resp.text().await?;
