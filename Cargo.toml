@@ -2,6 +2,13 @@
 name = "postgrest"
 version = "0.1.0"
 authors = ["Bobbie Soedirgo <bobbie@soedirgo.dev>"]
+description = "PostgREST client-side library"
+homepage = "https://github.com/supabase/postgrest-rs"
+repository = "https://github.com/supabase/postgrest-rs"
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+keywords = ["postgres", "postgrest", "rest", "api"]
+categories = ["development-tools"]
 edition = "2018"
 
 [dependencies]
