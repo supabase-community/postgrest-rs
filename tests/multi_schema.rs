@@ -48,7 +48,7 @@ async fn write_other_schema() -> Result<(), Box<dyn Error>> {
     let body = resp.text().await?;
     let body = json::parse(&body)?;
 
-    assert_eq!(body[0]["status"], "ONLINE");
+    assert_eq!(body[0]["status"], "OFFLINE");
 
     let other_client = Postgrest::new(REST_URL).schema("personal");
     let other_resp = other_client
