@@ -1,3 +1,5 @@
+extern crate reqwest;
+
 mod builder;
 mod filter;
 

@@ -1,5 +1,3 @@
-extern crate reqwest;
-
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client, Error, Method, Response,
@@ -21,6 +19,7 @@ pub struct Builder {
 // TODO: Response format
 // TODO: Resource embedding (embedded filters, etc.)
 // TODO: Content-Type (text/csv, etc.)
+// TODO: Reject update/delete w/o filters
 impl Builder {
     pub fn new<S>(url: S, schema: Option<String>) -> Self
     where
@@ -128,8 +127,7 @@ impl Builder {
         self.method = Method::POST;
         self.headers.insert(
             "Prefer",
-            // Maybe check if this works as intended...
-            HeaderValue::from_static("return=representation; resolution=merge-duplicates"),
+            HeaderValue::from_static("return=representation,resolution=merge-duplicates"),
         );
         self.body = Some(body.into());
         self
@@ -188,6 +186,10 @@ impl Builder {
             };
             self.headers
                 .append(key, HeaderValue::from_str(&schema).unwrap());
+        }
+        if self.method != Method::GET && self.method != Method::HEAD {
+            self.headers
+                .insert("Content-Type", HeaderValue::from_static("application/json"));
         }
         req = req.headers(self.headers).query(&self.queries);
         if let Some(body) = self.body {
@@ -278,7 +280,7 @@ mod tests {
         let builder = Builder::new(TABLE_URL, None).upsert("ignored");
         assert_eq!(
             builder.headers.get("Prefer").unwrap(),
-            HeaderValue::from_static("return=representation; resolution=merge-duplicates")
+            HeaderValue::from_static("return=representation,resolution=merge-duplicates")
         );
     }
 
@@ -302,5 +304,22 @@ mod tests {
         let builder = Builder::new(RPC_URL, None).rpc("{\"a\": 1, \"b\": 2}");
         assert_eq!(builder.body.unwrap(), "{\"a\": 1, \"b\": 2}");
         assert_eq!(builder.is_rpc, true);
+    }
+
+    #[test]
+    fn chain_filters() -> Result<(), Box<dyn std::error::Error>> {
+        let builder = Builder::new(TABLE_URL, None)
+            .eq("username", "supabot")
+            .neq("message", "hello world")
+            .gte("channel_id", "1")
+            .select("*");
+
+        let queries = builder.queries;
+        assert_eq!(queries.len(), 4);
+        assert!(queries.contains(&("username".into(), "eq.supabot".into())));
+        assert!(queries.contains(&("message".into(), "neq.hello world".into())));
+        assert!(queries.contains(&("channel_id".into(), "gte.1".into())));
+
+        Ok(())
     }
 }
