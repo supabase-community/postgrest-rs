@@ -19,8 +19,8 @@ pub struct Builder {
 // TODO: Complex filters (not, and, or)
 // TODO: Exact, planned, estimated count (HEAD verb)
 // TODO: Response format
-// TODO: Embedded resources
-// TODO: Content type (csv, etc.)
+// TODO: Resource embedding (embedded filters, etc.)
+// TODO: Content-Type (text/csv, etc.)
 impl Builder {
     pub fn new<S>(url: S, schema: Option<String>) -> Self
     where
@@ -126,7 +126,7 @@ impl Builder {
         S: Into<String>,
     {
         self.method = Method::POST;
-        self.headers.append(
+        self.headers.insert(
             "Prefer",
             // Maybe check if this works as intended...
             HeaderValue::from_static("return=representation; resolution=merge-duplicates"),
@@ -143,7 +143,7 @@ impl Builder {
     {
         self.method = Method::PUT;
         self.headers
-            .append("Prefer", HeaderValue::from_static("return=representation"));
+            .insert("Prefer", HeaderValue::from_static("return=representation"));
         self.queries
             .push((primary_column.into(), format!("eq.{}", key.into())));
         self.body = Some(body.into());
@@ -156,7 +156,7 @@ impl Builder {
     {
         self.method = Method::PATCH;
         self.headers
-            .append("Prefer", HeaderValue::from_static("return=representation"));
+            .insert("Prefer", HeaderValue::from_static("return=representation"));
         self.body = Some(body.into());
         self
     }
@@ -164,7 +164,7 @@ impl Builder {
     pub fn delete(mut self) -> Self {
         self.method = Method::DELETE;
         self.headers
-            .append("Prefer", HeaderValue::from_static("return=representation"));
+            .insert("Prefer", HeaderValue::from_static("return=representation"));
         self
     }
 
