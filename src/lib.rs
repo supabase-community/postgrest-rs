@@ -7,7 +7,7 @@
 //! ## Usage
 //!
 //! Simple example:
-//! ```rust,no_run
+//! ```ignore
 //! use postgrest::Postgrest;
 //!
 //! let client = Postgrest::new("https://your-postgrest-endpoint");
@@ -18,13 +18,11 @@
 //!     .await?;
 //! let body = resp
 //!     .text()
-//!     .await();
+//!     .await?;
 //! ```
 //!
 //! Using filters:
-//! ```rust,no_run
-//! # use postgrest::Postgrest;
-//! # let client = Postgrest::new("https://your-postgrest-endpoint");
+//! ```ignore
 //! let resp = client
 //!     .from("your_table")
 //!     .eq("country", "Germany")
@@ -35,9 +33,7 @@
 //! ```
 //!
 //! Updating a table:
-//! ```rust,no_run
-//! # use postgrest::Postgrest;
-//! # let client = Postgrest::new("https://your-postgrest-endpoint");
+//! ```ignore
 //! let resp = client
 //!     .from("your_table")
 //!     .eq("username", "soedirgo")
@@ -47,9 +43,7 @@
 //! ```
 //!
 //! Executing stored procedures:
-//! ```rust,no_run
-//! # use postgrest::Postgrest;
-//! # let client = Postgrest::new("https://your-postgrest-endpoint");
+//! ```ignore
 //! let resp = client
 //!     .rpc("add", "{\"a\": 1, \"b\": 2}")
 //!     .execute()
