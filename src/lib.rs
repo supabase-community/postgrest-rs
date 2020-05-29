@@ -7,9 +7,10 @@
 //! ## Usage
 //!
 //! Simple example:
-//! ```ignore
+//! ```
 //! use postgrest::Postgrest;
 //!
+//! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
 //! let client = Postgrest::new("https://your-postgrest-endpoint");
 //! let resp = client
 //!     .from("your_table")
@@ -19,10 +20,15 @@
 //! let body = resp
 //!     .text()
 //!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Using filters:
-//! ```ignore
+//! ```
+//! # use postgrest::Postgrest;
+//! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+//! # let client = Postgrest::new("https://your-postgrest-endpoint");
 //! let resp = client
 //!     .from("your_table")
 //!     .eq("country", "Germany")
@@ -30,24 +36,36 @@
 //!     .select("*")
 //!     .execute()
 //!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Updating a table:
-//! ```ignore
+//! ```
+//! # use postgrest::Postgrest;
+//! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+//! # let client = Postgrest::new("https://your-postgrest-endpoint");
 //! let resp = client
 //!     .from("your_table")
 //!     .eq("username", "soedirgo")
 //!     .update("{\"organization\": \"supabase\"}")
 //!     .execute()
 //!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Executing stored procedures:
-//! ```ignore
+//! ```
+//! # use postgrest::Postgrest;
+//! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+//! # let client = Postgrest::new("https://your-postgrest-endpoint");
 //! let resp = client
 //!     .rpc("add", "{\"a\": 1, \"b\": 2}")
 //!     .execute()
 //!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Check out the [README](https://github.com/supabase/postgrest-rs) for more examples.
