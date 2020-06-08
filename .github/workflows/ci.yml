@@ -1,19 +1,16 @@
 name: CI
 
-on:
-  pull_request:
-  push:
-    branches:
-      - master
-      # - staging
-      # - trying
+on: pull_request
 
 jobs:
   test:
+    name: Test
+
     strategy:
       matrix:
         # macos-latest doesn't have docker-compose, no manifest for windows-latest
         platform: [ubuntu-latest]
+
     runs-on: ${{ matrix.platform }}
 
     steps:
@@ -21,12 +18,6 @@ jobs:
 
       - name: Build the stack
         run: docker-compose -f ./tests/db/docker-compose.yml up -d
-
-      # HACK: Maybe find a more reliable way to do this
-      - name: Sleep for 30 seconds
-        uses: jakejarvis/wait-action@master
-        with:
-          time: "30s"
 
       - name: Set up toolchain
         uses: actions-rs/toolchain@v1
