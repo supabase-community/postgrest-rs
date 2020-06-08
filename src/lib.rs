@@ -1,6 +1,6 @@
 //! # postgrest-rs
 //!
-//! [PostgREST](https://postgrest.org) client-side library.
+//! [PostgREST][postgrest] client-side library.
 //!
 //! This library brings an ORM-like interface to PostgREST.
 //!
@@ -68,14 +68,17 @@
 //! # }
 //! ```
 //!
-//! Check out the [README](https://github.com/supabase/postgrest-rs) for more examples.
+//! Check out the [README][readme] for more examples.
+//!
+//! [postgrest]: https://postgrest.org
+//! [readme]: https://github.com/supabase/postgrest-rs
 
 extern crate reqwest;
 
 mod builder;
 mod filter;
 
-use builder::Builder;
+pub use builder::Builder;
 
 pub struct Postgrest {
     url: String,
