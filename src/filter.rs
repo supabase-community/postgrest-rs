@@ -1,8 +1,8 @@
 use crate::Builder;
 
-fn clean_param<S>(param: S) -> String
+fn clean_param<T>(param: T) -> String
 where
-    S: Into<String>,
+    T: Into<String>,
 {
     let param = param.into();
     if ",.:()".chars().any(|c| param.contains(c)) {
@@ -13,38 +13,152 @@ where
 }
 
 impl Builder {
+    /// Finds all rows which doesn't satisfy the filter.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .not("eq", "name", "New Zealand")
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn not<T, U, V>(mut self, operator: T, column: U, filter: V) -> Self
+    where
+        T: Into<String>,
+        U: Into<String>,
+        V: Into<String>,
+    {
+        self.queries.push((
+            clean_param(column),
+            format!("not.{}.{}", operator.into(), clean_param(filter)),
+        ));
+        self
+    }
+
+    /// Finds all rows satisfying all of the filters.
+    ///
+    /// # Note
+    ///
+    /// If your column/filter contains PostgREST's reserved characters, you need
+    /// to surround them with double quotes (not percent encoded). See
+    /// [here](https://postgrest.org/en/v7.0.0/api.html#reserved-characters) for
+    /// details.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .and("name.eq.New Zealand,or(id.gte.1,capital.is.null)")
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn and<T>(mut self, filters: T) -> Self
+    where
+        T: Into<String>,
+    {
+        self.queries
+            .push(("and".to_string(), format!("({})", filters.into())));
+        self
+    }
+
+    /// Finds all rows satisfying at least one of the filters.
+    ///
+    /// # Note
+    ///
+    /// If your column/filter contains PostgREST's reserved characters, you need
+    /// to surround them with double quotes (not percent encoded). See
+    /// [here](https://postgrest.org/en/v7.0.0/api.html#reserved-characters) for
+    /// details.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .or("name.eq.New Zealand,or(id.gte.1,capital.is.null)")
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn or<T>(mut self, filters: T) -> Self
+    where
+        T: Into<String>,
+    {
+        self.queries
+            .push(("or".to_string(), format!("({})", filters.into())));
+        self
+    }
+
     /// Finds all rows whose value on the stated `column` exactly matches the
     /// specified `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .eq("name", "New Zealand")
     ///     .select("*")
-    ///     .eq("name", "New Zealand");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn eq<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn eq<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((clean_param(column), format!("eq.{}", clean_param(filter))));
         self
     }
 
-    /// Finds all rows whose value on the stated `column` doesn't exactly match
-    /// the specified `filter`.
+    /// Finds all rows whose value on the stated `column` doesn't match the
+    /// specified `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .neq("name", "China")
     ///     .select("*")
-    ///     .neq("name", "China");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn neq<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn neq<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((clean_param(column), format!("neq.{}", clean_param(filter))));
@@ -53,17 +167,26 @@ impl Builder {
 
     /// Finds all rows whose value on the stated `column` is greater than the
     /// specified `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .gt("id", "20")
     ///     .select("*")
-    ///     .gt("id", "20");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn gt<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn gt<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((clean_param(column), format!("gt.{}", clean_param(filter))));
@@ -72,17 +195,26 @@ impl Builder {
 
     /// Finds all rows whose value on the stated `column` is greater than or
     /// equal to the specified `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .gte("id", "20")
     ///     .select("*")
-    ///     .gte("id", "20");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn gte<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn gte<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((clean_param(column), format!("gte.{}", clean_param(filter))));
@@ -91,17 +223,26 @@ impl Builder {
 
     /// Finds all rows whose value on the stated `column` is less than the
     /// specified `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .lt("id", "20")
     ///     .select("*")
-    ///     .lt("id", "20");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn lt<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn lt<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((clean_param(column), format!("lt.{}", clean_param(filter))));
@@ -110,17 +251,26 @@ impl Builder {
 
     /// Finds all rows whose value on the stated `column` is less than or equal
     /// to the specified `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .lte("id", "20")
     ///     .select("*")
-    ///     .lte("id", "20");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn lte<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn lte<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((clean_param(column), format!("lte.{}", clean_param(filter))));
@@ -129,22 +279,33 @@ impl Builder {
 
     /// Finds all rows whose value in the stated `column` matches the supplied
     /// `pattern` (case sensitive).
-    /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
-    ///     .select("*")
-    ///     .like("name", "%United%");
     ///
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
-    ///     .select("*")
-    ///     .like("name", "%United States%");
+    /// # Example
+    ///
     /// ```
-    pub fn like<S, T>(mut self, column: S, pattern: T) -> Self
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .like("name", "%United%")
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    ///
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .like("name", "%United States%")
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn like<T, U>(mut self, column: T, pattern: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         let pattern = pattern.into().replace('%', "*");
         self.queries
@@ -154,22 +315,33 @@ impl Builder {
 
     /// Finds all rows whose value in the stated `column` matches the supplied
     /// `pattern` (case insensitive).
-    /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
-    ///     .select("*")
-    ///     .ilike("name", "%United%");
     ///
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
-    ///     .select("*")
-    ///     .ilike("name", "%united states%");
+    /// # Example
+    ///
     /// ```
-    pub fn ilike<S, T>(mut self, column: S, pattern: T) -> Self
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .ilike("name", "%United%")
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    ///
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .ilike("name", "%united states%")
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn ilike<T, U>(mut self, column: T, pattern: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         let pattern = pattern.into().replace('%', "*");
         self.queries
@@ -179,17 +351,26 @@ impl Builder {
 
     /// A check for exact equality (null, true, false), finds all rows whose
     /// value on the stated `column` exactly match the specified `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .is("name", "null")
     ///     .select("*")
-    ///     .is("name", "null");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn is<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn is<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((clean_param(column), format!("is.{}", clean_param(filter))));
@@ -198,28 +379,41 @@ impl Builder {
 
     /// Finds all rows whose value on the stated `column` is found on the
     /// specified `values`.
-    /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
-    ///     .select("*")
-    ///     .in_("name", vec!["China", "France"]);
     ///
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
-    ///     .select("*")
-    ///     .in_("capitals", vec!["Beijing,China", "Paris,France"]);
+    /// # Example
     ///
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
-    ///     .select("*")
-    ///     .in_("food_supplies", vec!["carrot (big)", "carrot (small)"]);
     /// ```
-    pub fn in_<S, T, U>(mut self, column: S, values: T) -> Self
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .in_("name", vec!["China", "France"])
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    ///
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("countries")
+    ///     .in_("capitals", vec!["Beijing,China", "Paris,France"])
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    ///
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("recipes")
+    ///     .in_("food_supplies", vec!["carrot (big)", "carrot (small)"])
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn in_<T, U, V>(mut self, column: T, values: U) -> Self
     where
-        S: Into<String>,
-        T: IntoIterator<Item = U>,
-        U: Into<String>,
+        T: Into<String>,
+        U: IntoIterator<Item = V>,
+        V: Into<String>,
     {
         let values: Vec<_> = values.into_iter().map(clean_param).collect();
         self.queries
@@ -227,40 +421,56 @@ impl Builder {
         self
     }
 
-    // TODO: Sanitize input
-    /// Finds all rows whose json || array || range value on the stated `column`
+    /// Finds all rows whose json, array, or range value on the stated `column`
     /// contains the values specified in `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("users")
+    ///     .cs("age_range", "(10,20)")
     ///     .select("*")
-    ///     .cs("age_range", "(10,20)");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn cs<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn cs<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((clean_param(column), format!("cs.{}", filter.into())));
         self
     }
 
-    // TODO: Sanitize input
-    /// Finds all rows whose json || array || range value on the stated `column`
+    /// Finds all rows whose json, array, or range value on the stated `column`
     /// is contained by the specified `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("users")
+    ///     .cd("age_range", "(10,20)")
     ///     .select("*")
-    ///     .cd("age_range", "(10,20)");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn cd<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn cd<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((column.into(), format!("cd.{}", filter.into())));
@@ -269,16 +479,25 @@ impl Builder {
 
     /// Finds all rows whose range value on the stated `column` is strictly to
     /// the left of the specified `range`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
-    ///     .from("table")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
+    ///     .from("users")
+    ///     .sl("age_range", (10, 20))
     ///     .select("*")
-    ///     .sl("age_range", (10, 20));
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn sl<S>(mut self, column: S, range: (i64, i64)) -> Self
+    pub fn sl<T>(mut self, column: T, range: (i64, i64)) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         self.queries
             .push((column.into(), format!("sl.({},{})", range.0, range.1)));
@@ -287,16 +506,25 @@ impl Builder {
 
     /// Finds all rows whose range value on the stated `column` is strictly to
     /// the right of the specified `range`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
     ///     .from("table")
+    ///     .sr("age_range", (10, 20))
     ///     .select("*")
-    ///     .sr("age_range", (10, 20));
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn sr<S>(mut self, column: S, range: (i64, i64)) -> Self
+    pub fn sr<T>(mut self, column: T, range: (i64, i64)) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         self.queries
             .push((column.into(), format!("sr.({},{})", range.0, range.1)));
@@ -305,16 +533,25 @@ impl Builder {
 
     /// Finds all rows whose range value on the stated `column` does not extend
     /// to the left of the specified `range`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
     ///     .from("table")
+    ///     .nxl("age_range", (10, 20))
     ///     .select("*")
-    ///     .nxl("age_range", (10, 20));
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn nxl<S>(mut self, column: S, range: (i64, i64)) -> Self
+    pub fn nxl<T>(mut self, column: T, range: (i64, i64)) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         self.queries
             .push((column.into(), format!("nxl.({},{})", range.0, range.1)));
@@ -323,16 +560,25 @@ impl Builder {
 
     /// Finds all rows whose range value on the stated `column` does not extend
     /// to the right of the specified `range`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
     ///     .from("table")
+    ///     .nxr("age_range", (10, 20))
     ///     .select("*")
-    ///     .nxr("age_range", (10, 20));
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn nxr<S>(mut self, column: S, range: (i64, i64)) -> Self
+    pub fn nxr<T>(mut self, column: T, range: (i64, i64)) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         self.queries
             .push((column.into(), format!("nxr.({},{})", range.0, range.1)));
@@ -341,36 +587,53 @@ impl Builder {
 
     /// Finds all rows whose range value on the stated `column` is adjacent to
     /// the specified `range`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
     ///     .from("table")
+    ///     .adj("age_range", (10, 20))
     ///     .select("*")
-    ///     .adj("age_range", (10, 20));
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn adj<S>(mut self, column: S, range: (i64, i64)) -> Self
+    pub fn adj<T>(mut self, column: T, range: (i64, i64)) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         self.queries
             .push((column.into(), format!("adj.({},{})", range.0, range.1)));
         self
     }
 
-    // TODO: Sanitize input
-    /// Finds all rows whose array || range value on the stated `column` is
+    /// Finds all rows whose array or range value on the stated `column` is
     /// contained by the specified `filter`.
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
     ///     .from("table")
+    ///     .ov("age_range", "(10,20)")
     ///     .select("*")
-    ///     .ov("age_range", "(10,20)");
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn ov<S, T>(mut self, column: S, filter: T) -> Self
+    pub fn ov<T, U>(mut self, column: T, filter: U) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         self.queries
             .push((column.into(), format!("cd.{}", filter.into())));
@@ -379,17 +642,26 @@ impl Builder {
 
     /// Finds all rows whose tsvector value on the stated `column` matches
     /// to_tsquery(`tsquery`).
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
     ///     .from("table")
+    ///     .fts("phrase", "The Fat Cats", Some("english"))
     ///     .select("*")
-    ///     .fts("phrase", "The Fat Cats", Some("english"));
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn fts<S, T>(mut self, column: S, tsquery: T, config: Option<&str>) -> Self
+    pub fn fts<T, U>(mut self, column: T, tsquery: U, config: Option<&str>) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         let config = if let Some(conf) = config {
             format!("({})", conf)
@@ -403,17 +675,26 @@ impl Builder {
 
     /// Finds all rows whose tsvector value on the stated `column` matches
     /// plainto_tsquery(`tsquery`).
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
     ///     .from("table")
+    ///     .plfts("phrase", "The Fat Cats", None)
     ///     .select("*")
-    ///     .plfts("phrase", "The Fat Cats", None);
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn plfts<S, T>(mut self, column: S, tsquery: T, config: Option<&str>) -> Self
+    pub fn plfts<T, U>(mut self, column: T, tsquery: U, config: Option<&str>) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         let config = if let Some(conf) = config {
             format!("({})", conf)
@@ -427,17 +708,26 @@ impl Builder {
 
     /// Finds all rows whose tsvector value on the stated `column` matches
     /// phraseto_tsquery(`tsquery`).
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
     ///     .from("table")
+    ///     .phfts("phrase", "The Fat Cats", Some("english"))
     ///     .select("*")
-    ///     .phfts("phrase", "The Fat Cats", Some("english"));
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn phfts<S, T>(mut self, column: S, tsquery: T, config: Option<&str>) -> Self
+    pub fn phfts<T, U>(mut self, column: T, tsquery: U, config: Option<&str>) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         let config = if let Some(conf) = config {
             format!("({})", conf)
@@ -451,17 +741,26 @@ impl Builder {
 
     /// Finds all rows whose tsvector value on the stated `column` matches
     /// websearch_to_tsquery(`tsquery`).
+    ///
+    /// # Example
+    ///
     /// ```
-    /// # use postgrest::Postgrest;
-    /// let req = Postgrest::new("http://localhost:3000")
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let resp = Postgrest::new("http://localhost:3000")
     ///     .from("table")
+    ///     .wfts("phrase", "The Fat Cats", None)
     ///     .select("*")
-    ///     .wfts("phrase", "The Fat Cats", None);
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
     /// ```
-    pub fn wfts<S, T>(mut self, column: S, tsquery: T, config: Option<&str>) -> Self
+    pub fn wfts<T, U>(mut self, column: T, tsquery: U, config: Option<&str>) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
+        U: Into<String>,
     {
         let config = if let Some(conf) = config {
             format!("({})", conf)

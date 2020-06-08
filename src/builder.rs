@@ -3,34 +3,31 @@ use reqwest::{
     Client, Error, Method, Response,
 };
 
-#[derive(Default)]
 pub struct Builder {
     method: Method,
     url: String,
     schema: Option<String>,
+    // Need this to allow access from `filter.rs`
     pub(crate) queries: Vec<(String, String)>,
     headers: HeaderMap,
     body: Option<String>,
     is_rpc: bool,
 }
 
-// TODO: Complex filters (not, and, or)
-// TODO: Exact, planned, estimated count (HEAD verb)
-// TODO: Response format
-// TODO: Resource embedding (embedded filters, etc.)
-// TODO: Content-Type (text/csv, etc.)
-// TODO: Reject update/delete w/o filters
+// TODO: Test Unicode support
 impl Builder {
-    pub fn new<S>(url: S, schema: Option<String>) -> Self
+    pub fn new<T>(url: T, schema: Option<String>) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         let mut builder = Builder {
             method: Method::GET,
             url: url.into(),
             schema,
+            queries: Vec::new(),
             headers: HeaderMap::new(),
-            ..Default::default()
+            body: None,
+            is_rpc: false,
         };
         builder
             .headers
@@ -38,41 +35,33 @@ impl Builder {
         builder
     }
 
-    pub fn auth<S>(mut self, token: S) -> Self
+    pub fn auth<T>(mut self, token: T) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
-        self.headers.append(
+        self.headers.insert(
             "Authorization",
             HeaderValue::from_str(&format!("Bearer {}", token.into())).unwrap(),
         );
         self
     }
 
-    // TODO: Multiple columns
-    // TODO: Renaming columns
-    // TODO: Casting columns
-    // TODO: JSON columns
-    // TODO: Computed (virtual) columns
-    // TODO: Investigate character corner cases (Unicode, [ .,:()])
-    pub fn select<S>(mut self, column: S) -> Self
+    // TODO: Renaming, casting, & JSON column examples
+    // TODO: Resource embedding example
+    pub fn select<T>(mut self, columns: T) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         self.method = Method::GET;
-        self.queries.push(("select".to_string(), column.into()));
+        self.queries.push(("select".to_string(), columns.into()));
         self
     }
 
-    // TODO: desc/asc
-    // TODO: nullsfirst/nullslast
-    // TODO: Multiple columns
-    // TODO: Computed columns
-    pub fn order<S>(mut self, column: S) -> Self
+    pub fn order<T>(mut self, columns: T) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
-        self.queries.push(("order".to_string(), column.into()));
+        self.queries.push(("order".to_string(), columns.into()));
         self
     }
 
@@ -96,6 +85,31 @@ impl Builder {
         self
     }
 
+    fn count(mut self, method: &str) -> Self {
+        self.headers
+            .insert("Range-Unit", HeaderValue::from_static("items"));
+        // Value is irrelevant, we just want the size
+        self.headers
+            .insert("Range", HeaderValue::from_static("0-0"));
+        self.headers.insert(
+            "Prefer",
+            HeaderValue::from_str(&format!("count={}", method)).unwrap(),
+        );
+        self
+    }
+
+    pub fn exact_count(self) -> Self {
+        self.count("exact")
+    }
+
+    pub fn planned_count(self) -> Self {
+        self.count("planned")
+    }
+
+    pub fn estimated_count(self) -> Self {
+        self.count("estimated")
+    }
+
     pub fn single(mut self) -> Self {
         self.headers.insert(
             "Accept",
@@ -104,12 +118,9 @@ impl Builder {
         self
     }
 
-    // TODO: Write-only tables
-    // TODO: URL-encoded payload
-    // TODO: Allow specifying columns
-    pub fn insert<S>(mut self, body: S) -> Self
+    pub fn insert<T>(mut self, body: T) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         self.method = Method::POST;
         self.headers
@@ -118,11 +129,9 @@ impl Builder {
         self
     }
 
-    // TODO: Allow Prefer: resolution=ignore-duplicates
-    // TODO: on_conflict (make UPSERT work on UNIQUE columns)
-    pub fn upsert<S>(mut self, body: S) -> Self
+    pub fn upsert<T>(mut self, body: T) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         self.method = Method::POST;
         self.headers.insert(
@@ -133,24 +142,9 @@ impl Builder {
         self
     }
 
-    pub fn single_upsert<S, T, U>(mut self, primary_column: S, key: T, body: U) -> Self
+    pub fn update<T>(mut self, body: T) -> Self
     where
-        S: Into<String>,
         T: Into<String>,
-        U: Into<String>,
-    {
-        self.method = Method::PUT;
-        self.headers
-            .insert("Prefer", HeaderValue::from_static("return=representation"));
-        self.queries
-            .push((primary_column.into(), format!("eq.{}", key.into())));
-        self.body = Some(body.into());
-        self
-    }
-
-    pub fn update<S>(mut self, body: S) -> Self
-    where
-        S: Into<String>,
     {
         self.method = Method::PATCH;
         self.headers
@@ -166,9 +160,9 @@ impl Builder {
         self
     }
 
-    pub fn rpc<S>(mut self, params: S) -> Self
+    pub fn rpc<T>(mut self, params: T) -> Self
     where
-        S: Into<String>,
+        T: Into<String>,
     {
         self.method = Method::POST;
         self.body = Some(params.into());
@@ -185,7 +179,7 @@ impl Builder {
                 "Content-Profile"
             };
             self.headers
-                .append(key, HeaderValue::from_str(&schema).unwrap());
+                .insert(key, HeaderValue::from_str(&schema).unwrap());
         }
         if self.method != Method::GET && self.method != Method::HEAD {
             self.headers
@@ -205,7 +199,7 @@ mod tests {
     use super::*;
 
     const TABLE_URL: &str = "http://localhost:3000/table";
-    const RPC_URL: &str = "http://localhost/rpc";
+    const RPC_URL: &str = "http://localhost:3000/rpc";
 
     #[test]
     fn only_accept_json() {
@@ -281,15 +275,6 @@ mod tests {
         assert_eq!(
             builder.headers.get("Prefer").unwrap(),
             HeaderValue::from_static("return=representation,resolution=merge-duplicates")
-        );
-    }
-
-    #[test]
-    fn single_upsert_assert_prefer_header() {
-        let builder = Builder::new(TABLE_URL, None).single_upsert("ignored", "ignored", "ignored");
-        assert_eq!(
-            builder.headers.get("Prefer").unwrap(),
-            HeaderValue::from_static("return=representation")
         );
     }
 
