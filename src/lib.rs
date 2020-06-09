@@ -2,7 +2,8 @@
 //!
 //! [PostgREST][postgrest] client-side library.
 //!
-//! This library brings an ORM-like interface to PostgREST.
+//! This library is a thin wrapper that brings an ORM-like interface to
+//! PostgREST.
 //!
 //! ## Usage
 //!
@@ -11,7 +12,7 @@
 //! use postgrest::Postgrest;
 //!
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
-//! let client = Postgrest::new("https://your-postgrest-endpoint");
+//! let client = Postgrest::new("https://your.postgrest.endpoint");
 //! let resp = client
 //!     .from("your_table")
 //!     .select("*")
@@ -28,10 +29,10 @@
 //! ```
 //! # use postgrest::Postgrest;
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
-//! # let client = Postgrest::new("https://your-postgrest-endpoint");
+//! # let client = Postgrest::new("https://your.postgrest.endpoint");
 //! let resp = client
-//!     .from("your_table")
-//!     .eq("country", "Germany")
+//!     .from("countries")
+//!     .eq("name", "Germany")
 //!     .gte("id", "20")
 //!     .select("*")
 //!     .execute()
@@ -44,9 +45,9 @@
 //! ```
 //! # use postgrest::Postgrest;
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
-//! # let client = Postgrest::new("https://your-postgrest-endpoint");
+//! # let client = Postgrest::new("https://your.postgrest.endpoint");
 //! let resp = client
-//!     .from("your_table")
+//!     .from("users")
 //!     .eq("username", "soedirgo")
 //!     .update("{\"organization\": \"supabase\"}")
 //!     .execute()
@@ -59,16 +60,16 @@
 //! ```
 //! # use postgrest::Postgrest;
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
-//! # let client = Postgrest::new("https://your-postgrest-endpoint");
+//! # let client = Postgrest::new("https://your.postgrest.endpoint");
 //! let resp = client
-//!     .rpc("add", "{\"a\": 1, \"b\": 2}")
+//!     .rpc("add", r#"{"a": 1, "b": 2}"#)
 //!     .execute()
 //!     .await?;
 //! # Ok(())
 //! # }
 //! ```
 //!
-//! Check out the [README][readme] for more examples.
+//! Check out the [README][readme] for more info.
 //!
 //! [postgrest]: https://postgrest.org
 //! [readme]: https://github.com/supabase/postgrest-rs
@@ -86,6 +87,15 @@ pub struct Postgrest {
 }
 
 impl Postgrest {
+    /// Creates a Postgrest client.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("http://your.postgrest.endpoint");
+    /// ```
     pub fn new<T>(url: T) -> Self
     where
         T: Into<String>,
@@ -96,6 +106,20 @@ impl Postgrest {
         }
     }
 
+    /// Switches the schema.
+    ///
+    /// # Note
+    ///
+    /// You can only switch schemas before you call `from` or `rpc`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("http://your.postgrest.endpoint");
+    /// client.schema("private");
+    /// ```
     pub fn schema<T>(mut self, schema: T) -> Self
     where
         T: Into<String>,
@@ -104,6 +128,16 @@ impl Postgrest {
         self
     }
 
+    /// Perform a table operation.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("http://your.postgrest.endpoint");
+    /// client.from("table");
+    /// ```
     pub fn from<T>(&self, table: T) -> Builder
     where
         T: Into<String>,
@@ -112,6 +146,16 @@ impl Postgrest {
         Builder::new(url, self.schema.clone())
     }
 
+    /// Perform a stored procedure call.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("http://your.postgrest.endpoint");
+    /// client.rpc("multiply", r#"{"a": 1, "b": 2}"#);
+    /// ```
     pub fn rpc<T, U>(&self, function: T, params: U) -> Builder
     where
         T: Into<String>,
@@ -126,7 +170,7 @@ impl Postgrest {
 mod tests {
     use super::*;
 
-    const REST_URL: &str = "https://localhost:3000";
+    const REST_URL: &str = "http://localhost:3000";
 
     #[test]
     fn initialize() {

@@ -16,6 +16,7 @@ pub struct Builder {
 
 // TODO: Test Unicode support
 impl Builder {
+    /// Creates a new `Builder` with the specified `schema`.
     pub fn new<T>(url: T, schema: Option<String>) -> Self
     where
         T: Into<String>,
@@ -35,6 +36,18 @@ impl Builder {
         builder
     }
 
+    /// Authenticates the request with JWT.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("table")
+    ///     .auth("supers.ecretjw.ttoken");
+    /// ```
     pub fn auth<T>(mut self, token: T) -> Self
     where
         T: Into<String>,
@@ -46,8 +59,91 @@ impl Builder {
         self
     }
 
-    // TODO: Renaming, casting, & JSON column examples
-    // TODO: Resource embedding example
+    /// Performs horizontal filtering with SELECT.
+    ///
+    /// # Note
+    ///
+    /// `columns` is whitespace-sensitive, so you need to omit them unless your
+    /// column name contains whitespaces.
+    ///
+    /// # Example
+    ///
+    /// Simple example:
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("table")
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Renaming columns:
+    ///
+    /// ```
+    /// # use postgrest::Postgrest;
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("users")
+    ///     .select("name:very_very_long_column_name")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Casting columns:
+    ///
+    /// ```
+    /// # use postgrest::Postgrest;
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("users")
+    ///     .select("age::text")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// SELECTing JSON fields:
+    ///
+    /// ```
+    /// # use postgrest::Postgrest;
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("users")
+    ///     .select("id,json_data->phones->0->>number")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Embedded filters (assume there is a foreign key constraint between
+    /// tables `users` and `tweets`):
+    ///
+    /// ```
+    /// # use postgrest::Postgrest;
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("users")
+    ///     .select("*,tweets(*)")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn select<T>(mut self, columns: T) -> Self
     where
         T: Into<String>,
@@ -57,6 +153,19 @@ impl Builder {
         self
     }
 
+    /// Orders the result with the specified `columns`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .order("username.desc.nullsfirst,age_range");
+    /// ```
     pub fn order<T>(mut self, columns: T) -> Self
     where
         T: Into<String>,
@@ -65,6 +174,19 @@ impl Builder {
         self
     }
 
+    /// Limits the result with the specified `count`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .limit(20);
+    /// ```
     pub fn limit(mut self, count: usize) -> Self {
         self.headers
             .insert("Range-Unit", HeaderValue::from_static("items"));
@@ -75,6 +197,20 @@ impl Builder {
         self
     }
 
+    /// Limits the result to rows within the specified range, inclusive.
+    ///
+    /// # Example
+    ///
+    /// This retrieves the 2nd to 5th entries in the result:
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .range(1, 4);
+    /// ```
     pub fn range(mut self, low: usize, high: usize) -> Self {
         self.headers
             .insert("Range-Unit", HeaderValue::from_static("items"));
@@ -98,18 +234,72 @@ impl Builder {
         self
     }
 
+    /// Retrieves the (accurate) total size of the result.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .exact_count();
+    /// ```
     pub fn exact_count(self) -> Self {
         self.count("exact")
     }
 
+    /// Estimates the total size of the result using PostgreSQL statistics. This
+    /// is faster than using `exact_count()`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .planned_count();
+    /// ```
     pub fn planned_count(self) -> Self {
         self.count("planned")
     }
 
+    /// Retrieves the total size of the result using some heuristics:
+    /// `exact_count` for smaller sizes, `planned_count` for larger sizes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .estimated_count();
+    /// ```
     pub fn estimated_count(self) -> Self {
         self.count("estimated")
     }
 
+    /// Retrieves only one row from the result.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .single();
+    /// ```
     pub fn single(mut self) -> Self {
         self.headers.insert(
             "Accept",
@@ -118,6 +308,19 @@ impl Builder {
         self
     }
 
+    /// Performs an INSERT of the `body` (in JSON) into the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .insert(r#"[{ "username": "soedirgo", "status": "online" },
+    ///                 { "username": "jose", "status": "offline" }]"#);
+    /// ```
     pub fn insert<T>(mut self, body: T) -> Self
     where
         T: Into<String>,
@@ -129,6 +332,24 @@ impl Builder {
         self
     }
 
+    /// Performs an upsert of the `body` (in JSON) into the table.
+    ///
+    /// # Note
+    ///
+    /// This merges duplicates by default. Ignoring duplicates is possible via
+    /// PostgREST, but is currently unsupported.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .upsert(r#"[{ "username": "soedirgo", "status": "online" },
+    ///                 { "username": "jose", "status": "offline" }]"#);
+    /// ```
     pub fn upsert<T>(mut self, body: T) -> Self
     where
         T: Into<String>,
@@ -142,6 +363,19 @@ impl Builder {
         self
     }
 
+    /// Performs an UPDATE using the `body` (in JSON) on the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .eq("username", "soedirgo")
+    ///     .update(r#"{ "status": "offline" }"#);
+    /// ```
     pub fn update<T>(mut self, body: T) -> Self
     where
         T: Into<String>,
@@ -153,6 +387,19 @@ impl Builder {
         self
     }
 
+    /// Performs a DELETE on the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .eq("username", "soedirgo")
+    ///     .delete();
+    /// ```
     pub fn delete(mut self) -> Self {
         self.method = Method::DELETE;
         self.headers
@@ -160,6 +407,8 @@ impl Builder {
         self
     }
 
+    /// Performs a stored procedure call. This should only be used through the
+    /// `rpc()` method in `Postgrest`.
     pub fn rpc<T>(mut self, params: T) -> Self
     where
         T: Into<String>,
@@ -170,6 +419,7 @@ impl Builder {
         self
     }
 
+    /// Executes the PostgREST request.
     pub async fn execute(mut self) -> Result<Response, Error> {
         let mut req = Client::new().request(self.method.clone(), &self.url);
         if let Some(schema) = self.schema {
