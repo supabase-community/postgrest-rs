@@ -59,8 +59,91 @@ impl Builder {
         self
     }
 
-    // TODO: Renaming, casting, & JSON column examples
-    // TODO: Resource embedding example
+    /// Performs horizontal filtering with SELECT.
+    ///
+    /// # Note
+    ///
+    /// `columns` is whitespace-sensitive, so you need to omit them unless your
+    /// column name contains whitespaces.
+    ///
+    /// # Example
+    ///
+    /// Simple example:
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("table")
+    ///     .select("*")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Renaming columns:
+    ///
+    /// ```
+    /// # use postgrest::Postgrest;
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("users")
+    ///     .select("name:very_very_long_column_name")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Casting columns:
+    ///
+    /// ```
+    /// # use postgrest::Postgrest;
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("users")
+    ///     .select("age::text")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// SELECTing JSON fields:
+    ///
+    /// ```
+    /// # use postgrest::Postgrest;
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("users")
+    ///     .select("id,json_data->phones->0->>number")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Embedded filters (assume there is a foreign key constraint between
+    /// tables `users` and `tweets`):
+    ///
+    /// ```
+    /// # use postgrest::Postgrest;
+    /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let resp = client
+    ///     .from("users")
+    ///     .select("*,tweets(*)")
+    ///     .execute()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn select<T>(mut self, columns: T) -> Self
     where
         T: Into<String>,
