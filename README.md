@@ -119,3 +119,7 @@ Licensed under either of
 -   MIT license ([LICENSE-MIT](LICENSE-MIT) or https://opensource.org/licenses/MIT)
 
 at your option.
+
+---
+
+![](https://camo.githubusercontent.com/f266fbf746ee25b75480696176e356b84688f1e9/68747470733a2f2f67697463646e2e78797a2f7265706f2f73757061626173652f6d6f6e6f7265706f2f6d61737465722f7765622f7374617469632f77617463682d7265706f2e676966)
