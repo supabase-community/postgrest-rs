@@ -50,11 +50,11 @@ impl Builder {
     /// ```
     pub fn auth<T>(mut self, token: T) -> Self
     where
-        T: Into<String>,
+        T: AsRef<str>,
     {
         self.headers.insert(
             "Authorization",
-            HeaderValue::from_str(&format!("Bearer {}", token.into())).unwrap(),
+            HeaderValue::from_str(&format!("Bearer {}", token.as_ref())).unwrap(),
         );
         self
     }

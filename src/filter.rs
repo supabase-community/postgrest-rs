@@ -1,14 +1,12 @@
+use std::borrow::Cow;
+
 use crate::Builder;
 
-fn clean_param<T>(param: T) -> String
-where
-    T: Into<String>,
-{
-    let param = param.into();
+fn clean_param(param: &str) -> Cow<str> {
     if ",.:()".chars().any(|c| param.contains(c)) {
-        format!("\"{}\"", param)
+        format!("\"{}\"", param).into()
     } else {
-        param
+        param.into()
     }
 }
 
@@ -32,13 +30,13 @@ impl Builder {
     /// ```
     pub fn not<T, U, V>(mut self, operator: T, column: U, filter: V) -> Self
     where
-        T: Into<String>,
-        U: Into<String>,
-        V: Into<String>,
+        T: AsRef<str>,
+        U: AsRef<str>,
+        V: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column),
-            format!("not.{}.{}", operator.into(), clean_param(filter)),
+            clean_param(column.as_ref()).into(),
+            format!("not.{}.{}", operator.as_ref(), clean_param(filter.as_ref())),
         ));
         self
     }
@@ -69,10 +67,10 @@ impl Builder {
     /// ```
     pub fn and<T>(mut self, filters: T) -> Self
     where
-        T: Into<String>,
+        T: AsRef<str>,
     {
         self.queries
-            .push(("and".to_string(), format!("({})", filters.into())));
+            .push(("and".to_string(), format!("({})", filters.as_ref())));
         self
     }
 
@@ -102,10 +100,10 @@ impl Builder {
     /// ```
     pub fn or<T>(mut self, filters: T) -> Self
     where
-        T: Into<String>,
+        T: AsRef<str>,
     {
         self.queries
-            .push(("or".to_string(), format!("({})", filters.into())));
+            .push(("or".to_string(), format!("({})", filters.as_ref())));
         self
     }
 
@@ -129,11 +127,13 @@ impl Builder {
     /// ```
     pub fn eq<T, U>(mut self, column: T, filter: U) -> Self
     where
-        T: Into<String>,
-        U: Into<String>,
+        T: AsRef<str>,
+        U: AsRef<str>,
     {
-        self.queries
-            .push((clean_param(column), format!("eq.{}", clean_param(filter))));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("eq.{}", clean_param(filter.as_ref())),
+        ));
         self
     }
 
@@ -157,11 +157,13 @@ impl Builder {
     /// ```
     pub fn neq<T, U>(mut self, column: T, filter: U) -> Self
     where
-        T: Into<String>,
-        U: Into<String>,
+        T: AsRef<str>,
+        U: AsRef<str>,
     {
-        self.queries
-            .push((clean_param(column), format!("neq.{}", clean_param(filter))));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("neq.{}", clean_param(filter.as_ref())),
+        ));
         self
     }
 
@@ -185,11 +187,13 @@ impl Builder {
     /// ```
     pub fn gt<T, U>(mut self, column: T, filter: U) -> Self
     where
-        T: Into<String>,
-        U: Into<String>,
+        T: AsRef<str>,
+        U: AsRef<str>,
     {
-        self.queries
-            .push((clean_param(column), format!("gt.{}", clean_param(filter))));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("gt.{}", clean_param(filter.as_ref())),
+        ));
         self
     }
 
@@ -213,11 +217,13 @@ impl Builder {
     /// ```
     pub fn gte<T, U>(mut self, column: T, filter: U) -> Self
     where
-        T: Into<String>,
-        U: Into<String>,
+        T: AsRef<str>,
+        U: AsRef<str>,
     {
-        self.queries
-            .push((clean_param(column), format!("gte.{}", clean_param(filter))));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("gte.{}", clean_param(filter.as_ref())),
+        ));
         self
     }
 
@@ -241,11 +247,13 @@ impl Builder {
     /// ```
     pub fn lt<T, U>(mut self, column: T, filter: U) -> Self
     where
-        T: Into<String>,
-        U: Into<String>,
+        T: AsRef<str>,
+        U: AsRef<str>,
     {
-        self.queries
-            .push((clean_param(column), format!("lt.{}", clean_param(filter))));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("lt.{}", clean_param(filter.as_ref())),
+        ));
         self
     }
 
@@ -269,11 +277,13 @@ impl Builder {
     /// ```
     pub fn lte<T, U>(mut self, column: T, filter: U) -> Self
     where
-        T: Into<String>,
-        U: Into<String>,
+        T: AsRef<str>,
+        U: AsRef<str>,
     {
-        self.queries
-            .push((clean_param(column), format!("lte.{}", clean_param(filter))));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("lte.{}", clean_param(filter.as_ref())),
+        ));
         self
     }
 
@@ -304,12 +314,14 @@ impl Builder {
     /// ```
     pub fn like<T, U>(mut self, column: T, pattern: U) -> Self
     where
-        T: Into<String>,
+        T: AsRef<str>,
         U: Into<String>,
     {
         let pattern = pattern.into().replace('%', "*");
-        self.queries
-            .push((clean_param(column), format!("like.{}", pattern)));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("like.{}", pattern),
+        ));
         self
     }
 
@@ -340,12 +352,14 @@ impl Builder {
     /// ```
     pub fn ilike<T, U>(mut self, column: T, pattern: U) -> Self
     where
-        T: Into<String>,
+        T: AsRef<str>,
         U: Into<String>,
     {
         let pattern = pattern.into().replace('%', "*");
-        self.queries
-            .push((clean_param(column), format!("ilike.{}", pattern)));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("ilike.{}", pattern),
+        ));
         self
     }
 
@@ -369,11 +383,13 @@ impl Builder {
     /// ```
     pub fn is<T, U>(mut self, column: T, filter: U) -> Self
     where
-        T: Into<String>,
-        U: Into<String>,
+        T: AsRef<str>,
+        U: AsRef<str>,
     {
-        self.queries
-            .push((clean_param(column), format!("is.{}", clean_param(filter))));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("is.{}", clean_param(filter.as_ref())),
+        ));
         self
     }
 
@@ -411,13 +427,18 @@ impl Builder {
     /// ```
     pub fn in_<T, U, V>(mut self, column: T, values: U) -> Self
     where
-        T: Into<String>,
+        T: AsRef<str>,
         U: IntoIterator<Item = V>,
-        V: Into<String>,
+        V: AsRef<str>,
     {
-        let values: Vec<_> = values.into_iter().map(clean_param).collect();
-        self.queries
-            .push((clean_param(column), format!("in.({})", values.join(","))));
+        let mut values: String = values
+            .into_iter()
+            .fold(String::new(), |a, s| a + &clean_param(s.as_ref()) + ",");
+        values.pop();
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("in.({})", values),
+        ));
         self
     }
 
@@ -441,11 +462,13 @@ impl Builder {
     /// ```
     pub fn cs<T, U>(mut self, column: T, filter: U) -> Self
     where
-        T: Into<String>,
-        U: Into<String>,
+        T: AsRef<str>,
+        U: AsRef<str>,
     {
-        self.queries
-            .push((clean_param(column), format!("cs.{}", filter.into())));
+        self.queries.push((
+            clean_param(column.as_ref()).into(),
+            format!("cs.{}", filter.as_ref()),
+        ));
         self
     }
 
@@ -470,10 +493,10 @@ impl Builder {
     pub fn cd<T, U>(mut self, column: T, filter: U) -> Self
     where
         T: Into<String>,
-        U: Into<String>,
+        U: AsRef<str>,
     {
         self.queries
-            .push((column.into(), format!("cd.{}", filter.into())));
+            .push((column.into(), format!("cd.{}", filter.as_ref())));
         self
     }
 
@@ -633,10 +656,10 @@ impl Builder {
     pub fn ov<T, U>(mut self, column: T, filter: U) -> Self
     where
         T: Into<String>,
-        U: Into<String>,
+        U: AsRef<str>,
     {
         self.queries
-            .push((column.into(), format!("cd.{}", filter.into())));
+            .push((column.into(), format!("cd.{}", filter.as_ref())));
         self
     }
 
@@ -661,7 +684,7 @@ impl Builder {
     pub fn fts<T, U>(mut self, column: T, tsquery: U, config: Option<&str>) -> Self
     where
         T: Into<String>,
-        U: Into<String>,
+        U: AsRef<str>,
     {
         let config = if let Some(conf) = config {
             format!("({})", conf)
@@ -669,7 +692,7 @@ impl Builder {
             String::new()
         };
         self.queries
-            .push((column.into(), format!("fts{}.{}", config, tsquery.into())));
+            .push((column.into(), format!("fts{}.{}", config, tsquery.as_ref())));
         self
     }
 
@@ -694,15 +717,17 @@ impl Builder {
     pub fn plfts<T, U>(mut self, column: T, tsquery: U, config: Option<&str>) -> Self
     where
         T: Into<String>,
-        U: Into<String>,
+        U: AsRef<str>,
     {
         let config = if let Some(conf) = config {
             format!("({})", conf)
         } else {
             String::new()
         };
-        self.queries
-            .push((column.into(), format!("plfts{}.{}", config, tsquery.into())));
+        self.queries.push((
+            column.into(),
+            format!("plfts{}.{}", config, tsquery.as_ref()),
+        ));
         self
     }
 
@@ -727,15 +752,17 @@ impl Builder {
     pub fn phfts<T, U>(mut self, column: T, tsquery: U, config: Option<&str>) -> Self
     where
         T: Into<String>,
-        U: Into<String>,
+        U: AsRef<str>,
     {
         let config = if let Some(conf) = config {
             format!("({})", conf)
         } else {
             String::new()
         };
-        self.queries
-            .push((column.into(), format!("phfts{}.{}", config, tsquery.into())));
+        self.queries.push((
+            column.into(),
+            format!("phfts{}.{}", config, tsquery.as_ref()),
+        ));
         self
     }
 
@@ -760,15 +787,17 @@ impl Builder {
     pub fn wfts<T, U>(mut self, column: T, tsquery: U, config: Option<&str>) -> Self
     where
         T: Into<String>,
-        U: Into<String>,
+        U: AsRef<str>,
     {
         let config = if let Some(conf) = config {
             format!("({})", conf)
         } else {
             String::new()
         };
-        self.queries
-            .push((column.into(), format!("wfts{}.{}", config, tsquery.into())));
+        self.queries.push((
+            column.into(),
+            format!("wfts{}.{}", config, tsquery.as_ref()),
+        ));
         self
     }
 }
