@@ -140,9 +140,9 @@ impl Postgrest {
     /// ```
     pub fn from<T>(&self, table: T) -> Builder
     where
-        T: Into<String>,
+        T: AsRef<str>,
     {
-        let url = format!("{}/{}", self.url, table.into());
+        let url = format!("{}/{}", self.url, table.as_ref());
         Builder::new(url, self.schema.clone())
     }
 
@@ -158,10 +158,10 @@ impl Postgrest {
     /// ```
     pub fn rpc<T, U>(&self, function: T, params: U) -> Builder
     where
-        T: Into<String>,
+        T: AsRef<str>,
         U: Into<String>,
     {
-        let url = format!("{}/rpc/{}", self.url, function.into());
+        let url = format!("{}/rpc/{}", self.url, function.as_ref());
         Builder::new(url, self.schema.clone()).rpc(params)
     }
 }
