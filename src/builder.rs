@@ -59,6 +59,46 @@ impl Builder {
         self
     }
 
+    /// Authenticates the request in SupaBase using an API key and JWT.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint/rest/v1/");
+    /// client
+    ///     .from("table")
+    ///     .supa_auth("supers.ecretjw.ttoken", None);
+    /// ```
+    pub fn supa_auth<T>(mut self, api_key: T, jwt: Option<String>) -> Self
+    where
+        T: AsRef<str>,
+    {
+        self.headers.insert(
+            "apikey",
+            HeaderValue::from_str(api_key.as_ref())
+                .expect("Error with api_key parameter in supa_auth()"),
+        );
+        match jwt {
+            Some(_jwt) => {
+                self.headers.insert(
+                    "Authorization",
+                    HeaderValue::from_str(&format!("Bearer {}", _jwt))
+                        .expect("Error with JWT passed parameter in supa_auth()"),
+                );
+            }
+            None => {
+                self.headers.insert(
+                    "Authorization",
+                    HeaderValue::from_str(&format!("Bearer {}", api_key.as_ref()))
+                        .expect("Error with api_key parameter as JWT in supa_auth()"),
+                );
+            }
+        }
+        self
+    }
+
     /// Performs horizontal filtering with SELECT.
     ///
     /// # Note
@@ -466,6 +506,15 @@ mod tests {
         assert_eq!(
             builder.headers.get("Authorization").unwrap(),
             HeaderValue::from_static("Bearer $Up3rS3crET")
+        );
+    }
+
+    #[test]
+    fn auth_supabase() {
+        let builder = Builder::new(TABLE_URL, None).supa_auth("$Up3rS3crET", None);
+        assert_eq!(
+            builder.headers.get("apikey").unwrap(),
+            HeaderValue::from_static("$Up3rS3crET")
         );
     }
 
