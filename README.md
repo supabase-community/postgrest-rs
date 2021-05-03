@@ -21,9 +21,26 @@ Simple example:
 ```rust
 use postgrest::Postgrest;
 
-let client = Postgrest::new("https://your.postgrest.endpoint");
+let client = Postgrest::new("https://your.postgrest.endpoint")
+    .auth("YOUR_POSTGREST_JWT");
 let resp = client
     .from("your_table")
+    .select("*")
+    .execute()
+    .await?;
+let body = resp
+    .text()
+    .await?;
+```
+
+Example using SupaBase API key but no user JWT:
+```rust
+use postgrest::Postgrest;
+
+let client = Postgrest::new("https://your-supabase.endpoint/rest/v1/")
+    .supa_auth("YOUR_SUPABASE_PUBLIC_API_KEY", None);
+let resp = client
+    .from("YOUR_TABLE")
     .select("*")
     .execute()
     .await?;
