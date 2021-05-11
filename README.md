@@ -32,6 +32,77 @@ let body = resp
     .await?;
 ```
 
+Simple example with JWT auth
+
+```rust
+use postgrest::Postgrest;
+
+let client = Postgrest::new("https://your.postgrest.endpoint");
+let resp = client
+    .from("your_table")
+    .auth("VerySensitiveJWTValueAsStringOrStr")
+    .select("*")
+    .execute()
+    .await?;
+let body = resp
+    .text()
+    .await?;
+```
+
+Simplified example using an authenticated API gateway and JWT authorization (like SupaBase).
+
+```rust
+use postgrest::Postgrest;
+
+static HEADER_KEY: &str = "apikey";
+let header_value: String = "ExampleAPIKeyValue".to_string(); // EXAMPLE ONLY! 
+// Don't actually hard code this value, that's really bad. Use environment
+// variables like with the dotenv(https://crates.io/crates/dotenv) crate to inject
+
+let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/");
+let resp = client
+    .from("your_table")
+    .auth(header_value)
+    .insert_header(HEADER_KEY, header_value)
+    .select("*")
+    .execute()
+    .await?;
+let body = resp
+    .text()
+    .await?;
+
+```
+
+**Secure** example with authenticated API gateway and JWT authorization using the dotenv crate to correctly retrieve sensitive values.
+
+```rust
+use postgrest::Postgrest;
+use dotenv;
+
+dotenv().ok(); 
+
+static HEADER_KEY: &str = "apikey";
+
+let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/");
+let resp = client
+    .from("your_table")
+    .auth(env::var("supabase_public_api_key").unwrap().to_string()))
+    .insert_header(
+        HEADER_KEY, 
+        env::var("supabase_public_api_key").unwrap().to_string())
+    .select("*")
+    .execute()
+    .await?;
+let body = resp
+    .text()
+    .await?;
+
+```
+
+### Building Queries
+
+These examples assume you've already initialized the client.  The methods `.from()` and `.rpc()` initalizes the query builder inside the client.
+
 Using filters:
 
 ```rust
