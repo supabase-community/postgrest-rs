@@ -59,6 +59,31 @@ impl Builder {
         self
     }
 
+    /// Add arbitrary headers to the request.  For instance when you may want to connect
+    /// through an api gateway that needs an API key header in addition to the JWT.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// static header_name: &'static str =  "foo";
+    /// let header_value: String = "bar".to_string();
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint/rest/v1/");
+    /// client
+    ///     .from("table")
+    ///     .insert_header(header_name, header_value);
+    /// ```
+    pub fn insert_header(mut self, header_name: &'static str, header_value: String) -> Self {
+        self.headers.insert(
+            header_name,
+            HeaderValue::from_str(&header_value)
+                .expect("Couldn't convert supplied header value from String to str."),
+        );
+        self
+    }
+
     /// Performs horizontal filtering with SELECT.
     ///
     /// # Note
@@ -466,6 +491,17 @@ mod tests {
         assert_eq!(
             builder.headers.get("Authorization").unwrap(),
             HeaderValue::from_static("Bearer $Up3rS3crET")
+        );
+    }
+
+    #[test]
+    fn with_insert_header() {
+        static A_HEADER_KEY: &str = "foo";
+        let a_header_value: String = "bar".to_string();
+        let builder = Builder::new(TABLE_URL, None).insert_header(A_HEADER_KEY, a_header_value);
+        assert_eq!(
+            builder.headers.get("foo").unwrap(),
+            HeaderValue::from_static("bar")
         );
     }
 
