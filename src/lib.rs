@@ -74,16 +74,16 @@
 //! [postgrest]: https://postgrest.org
 //! [readme]: https://github.com/supabase/postgrest-rs
 
-extern crate reqwest;
-
 mod builder;
 mod filter;
 
 pub use builder::Builder;
+use reqwest::header::{HeaderMap, HeaderValue, IntoHeaderName};
 
 pub struct Postgrest {
     url: String,
     schema: Option<String>,
+    headers: HeaderMap,
 }
 
 impl Postgrest {
@@ -103,6 +103,7 @@ impl Postgrest {
         Postgrest {
             url: url.into(),
             schema: None,
+            headers: HeaderMap::new(),
         }
     }
 
@@ -128,6 +129,30 @@ impl Postgrest {
         self
     }
 
+    /// Add arbitrary headers to the request.  For instance when you may want to connect
+    /// through an API gateway that needs an API key header.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint")
+    ///     .insert_header("apikey", "super.secret.key")
+    ///     .from("table");
+    /// ```
+    pub fn insert_header(
+        mut self,
+        header_name: impl IntoHeaderName,
+        header_value: impl AsRef<str>,
+    ) -> Self {
+        self.headers.insert(
+            header_name,
+            HeaderValue::from_str(header_value.as_ref()).expect("Invalid header value."),
+        );
+        self
+    }
+
     /// Perform a table operation.
     ///
     /// # Example
@@ -143,7 +168,7 @@ impl Postgrest {
         T: AsRef<str>,
     {
         let url = format!("{}/{}", self.url, table.as_ref());
-        Builder::new(url, self.schema.clone())
+        Builder::new(url, self.schema.clone(), self.headers.clone())
     }
 
     /// Perform a stored procedure call.
@@ -162,7 +187,7 @@ impl Postgrest {
         U: Into<String>,
     {
         let url = format!("{}/rpc/{}", self.url, function.as_ref());
-        Builder::new(url, self.schema.clone()).rpc(params)
+        Builder::new(url, self.schema.clone(), self.headers.clone()).rpc(params)
     }
 }
 
@@ -182,6 +207,18 @@ mod tests {
         assert_eq!(
             Postgrest::new(REST_URL).schema("private").schema,
             Some("private".to_string())
+        );
+    }
+
+    #[test]
+    fn with_insert_header() {
+        assert_eq!(
+            Postgrest::new(REST_URL)
+                .insert_header("apikey", "super.secret.key")
+                .headers
+                .get("apikey")
+                .unwrap(),
+            "super.secret.key"
         );
     }
 }

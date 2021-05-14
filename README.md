@@ -49,31 +49,26 @@ let body = resp
     .await?;
 ```
 
-Simplified example using an authenticated API gateway and JWT authorization (like SupaBase).
+Simplified example using a custom header (e.g. for API gateway authentication with Supabase).
 
 ```rust
 use postgrest::Postgrest;
 
-static HEADER_KEY: &str = "apikey";
-let header_value: String = "ExampleAPIKeyValue".to_string(); // EXAMPLE ONLY! 
+let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/")
+    .insert_header("apikey", "ExampleAPIKeyValue"); // EXAMPLE ONLY!
 // Don't actually hard code this value, that's really bad. Use environment
 // variables like with the dotenv(https://crates.io/crates/dotenv) crate to inject
-
-let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/");
 let resp = client
     .from("your_table")
-    .auth(header_value)
-    .insert_header(HEADER_KEY, header_value)
     .select("*")
     .execute()
     .await?;
 let body = resp
     .text()
     .await?;
-
 ```
 
-**Secure** example with authenticated API gateway and JWT authorization using the dotenv crate to correctly retrieve sensitive values.
+**Secure** example with authenticated API gateway using the dotenv crate to correctly retrieve sensitive values.
 
 ```rust
 use postgrest::Postgrest;
@@ -81,22 +76,18 @@ use dotenv;
 
 dotenv().ok(); 
 
-static HEADER_KEY: &str = "apikey";
-
 let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/");
+    .insert_header(
+        "apikey",
+        env::var("SUPABASE_PUBLIC_API_KEY").unwrap())
 let resp = client
     .from("your_table")
-    .auth(env::var("supabase_public_api_key").unwrap().to_string()))
-    .insert_header(
-        HEADER_KEY, 
-        env::var("supabase_public_api_key").unwrap().to_string())
     .select("*")
     .execute()
     .await?;
 let body = resp
     .text()
     .await?;
-
 ```
 
 ### Building Queries
