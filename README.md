@@ -147,7 +147,7 @@ let resp = client
     .wfts("phrase", "The Fat Cats", None)
     .cs("countries", "(10,20)")
     .cd("countries", "(10,20)")
-    .ov("population_range", (100, 500))
+    .ov("population_range", "(100,500)")
     .sl("population_range", (100, 500))               // ...and range operations!
     .sr("population_range", (100, 500))               // Find out more about the filters at:
     .nxl("population_range", (100, 500))              // https://postgrest.org/en/stable/api.html#operators
