@@ -635,8 +635,8 @@ impl Builder {
         self
     }
 
-    /// Finds all rows whose array or range value on the stated `column` is
-    /// contained by the specified `filter`.
+    /// Finds all rows whose array or range value on the stated `column`
+    /// overlaps with the specified `filter`.
     ///
     /// # Example
     ///
