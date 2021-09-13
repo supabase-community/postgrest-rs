@@ -74,12 +74,12 @@ let body = resp
 use postgrest::Postgrest;
 use dotenv;
 
-dotenv().ok(); 
+dotenv::dotenv().ok(); 
 
-let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/");
+let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/")
     .insert_header(
         "apikey",
-        env::var("SUPABASE_PUBLIC_API_KEY").unwrap())
+        dotenv::var("SUPABASE_PUBLIC_API_KEY").unwrap())
 let resp = client
     .from("your_table")
     .select("*")
