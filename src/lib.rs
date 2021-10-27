@@ -77,7 +77,7 @@
 mod builder;
 mod filter;
 
-pub use builder::Builder;
+pub use builder::{Builder, Finish, Start};
 use reqwest::header::{HeaderMap, HeaderValue, IntoHeaderName};
 
 pub struct Postgrest {
@@ -168,7 +168,7 @@ impl Postgrest {
         T: AsRef<str>,
     {
         let url = format!("{}/{}", self.url, table.as_ref());
-        Builder::new(url, self.schema.clone(), self.headers.clone())
+        self.build(&url)
     }
 
     /// Perform a stored procedure call.
@@ -181,13 +181,18 @@ impl Postgrest {
     /// let client = Postgrest::new("http://your.postgrest.endpoint");
     /// client.rpc("multiply", r#"{"a": 1, "b": 2}"#);
     /// ```
-    pub fn rpc<T, U>(&self, function: T, params: U) -> Builder
+    pub fn rpc<T, U>(&self, function: T, params: U) -> Builder<Finish>
     where
         T: AsRef<str>,
         U: Into<String>,
     {
         let url = format!("{}/rpc/{}", self.url, function.as_ref());
-        Builder::new(url, self.schema.clone(), self.headers.clone()).rpc(params)
+        self.build(&url).rpc(params)
+    }
+
+    #[doc(hidden)]
+    fn build(&self, url: &str) -> Builder<Start> {
+        Builder::new(url, self.schema.clone(), self.headers.clone())
     }
 }
 
@@ -199,6 +204,8 @@ mod tests {
 
     #[test]
     fn initialize() {
+        //     Postgrest::new("adada").from("your_table")
+        // .eq("country", "Germany").execute
         assert_eq!(Postgrest::new(REST_URL).url, REST_URL);
     }
 

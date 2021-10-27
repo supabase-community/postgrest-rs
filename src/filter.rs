@@ -10,7 +10,7 @@ fn clean_param(param: &str) -> Cow<str> {
     }
 }
 
-impl Builder {
+impl<Stage> Builder<Stage> {
     /// Finds all rows which doesn't satisfy the filter.
     ///
     /// # Example

@@ -1,21 +1,26 @@
+use std::marker;
+
 use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client, Error, Method, Response,
 };
 
-pub struct Builder {
-    method: Method,
+pub enum Start {}
+pub enum Finish {}
+
+pub struct Builder<Stage = Start> {
+    pub(crate) method: Method,
     url: String,
     schema: Option<String>,
     // Need this to allow access from `filter.rs`
-    pub(crate) queries: Vec<(String, String)>,
+    pub(super) queries: Vec<(String, String)>,
     headers: HeaderMap,
-    body: Option<String>,
-    is_rpc: bool,
+    pub(crate) body: Option<String>,
+    pub(crate) is_rpc: bool,
+    stage: marker::PhantomData<Stage>,
 }
 
-// TODO: Test Unicode support
-impl Builder {
+impl Builder<Start> {
     /// Creates a new `Builder` with the specified `schema`.
     pub fn new<T>(url: T, schema: Option<String>, headers: HeaderMap) -> Self
     where
@@ -29,34 +34,12 @@ impl Builder {
             headers,
             body: None,
             is_rpc: false,
+            stage: marker::PhantomData,
         };
         builder
             .headers
             .insert("Accept", HeaderValue::from_static("application/json"));
         builder
-    }
-
-    /// Authenticates the request with JWT.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use postgrest::Postgrest;
-    ///
-    /// let client = Postgrest::new("https://your.postgrest.endpoint");
-    /// client
-    ///     .from("table")
-    ///     .auth("supers.ecretjw.ttoken");
-    /// ```
-    pub fn auth<T>(mut self, token: T) -> Self
-    where
-        T: AsRef<str>,
-    {
-        self.headers.insert(
-            "Authorization",
-            HeaderValue::from_str(&format!("Bearer {}", token.as_ref())).unwrap(),
-        );
-        self
     }
 
     /// Performs horizontal filtering with SELECT.
@@ -144,12 +127,207 @@ impl Builder {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn select<T>(mut self, columns: T) -> Self
+    pub fn select<T>(mut self, columns: T) -> Builder<Finish>
     where
         T: Into<String>,
     {
-        self.method = Method::GET;
         self.queries.push(("select".to_string(), columns.into()));
+        Builder {
+            method: Method::GET,
+            url: self.url,
+            schema: self.schema,
+            queries: self.queries,
+            headers: self.headers,
+            body: self.body,
+            is_rpc: self.is_rpc,
+            stage: marker::PhantomData,
+        }
+    }
+
+    /// Performs an INSERT of the `body` (in JSON) into the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .insert(r#"[{ "username": "soedirgo", "status": "online" },
+    ///                 { "username": "jose", "status": "offline" }]"#);
+    /// ```
+    pub fn insert<T>(mut self, body: T) -> Builder<Finish>
+    where
+        T: Into<String>,
+    {
+        self.headers
+            .insert("Prefer", HeaderValue::from_static("return=representation"));
+        Builder {
+            method: Method::POST,
+            url: self.url,
+            schema: self.schema,
+            queries: self.queries,
+            headers: self.headers,
+            body: Some(body.into()),
+            is_rpc: self.is_rpc,
+            stage: marker::PhantomData,
+        }
+    }
+
+    /// Performs an upsert of the `body` (in JSON) into the table.
+    ///
+    /// # Note
+    ///
+    /// This merges duplicates by default. Ignoring duplicates is possible via
+    /// PostgREST, but is currently unsupported.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .upsert(r#"[{ "username": "soedirgo", "status": "online" },
+    ///                 { "username": "jose", "status": "offline" }]"#);
+    /// ```
+    pub fn upsert<T>(mut self, body: T) -> Builder<Finish>
+    where
+        T: Into<String>,
+    {
+        self.headers.insert(
+            "Prefer",
+            HeaderValue::from_static("return=representation,resolution=merge-duplicates"),
+        );
+        Builder {
+            method: Method::POST,
+            url: self.url,
+            schema: self.schema,
+            queries: self.queries,
+            headers: self.headers,
+            body: Some(body.into()),
+            is_rpc: self.is_rpc,
+            stage: marker::PhantomData,
+        }
+    }
+
+    /// Performs an UPDATE using the `body` (in JSON) on the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .eq("username", "soedirgo")
+    ///     .update(r#"{ "status": "offline" }"#);
+    /// ```
+    pub fn update<T>(mut self, body: T) -> Builder<Finish>
+    where
+        T: Into<String>,
+    {
+        self.method = Method::PATCH;
+        self.headers
+            .insert("Prefer", HeaderValue::from_static("return=representation"));
+        Builder {
+            method: Method::PATCH,
+            url: self.url,
+            schema: self.schema,
+            queries: self.queries,
+            headers: self.headers,
+            body: Some(body.into()),
+            is_rpc: self.is_rpc,
+            stage: marker::PhantomData,
+        }
+    }
+
+    /// Performs a DELETE on the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .eq("username", "soedirgo")
+    ///     .delete();
+    /// ```
+    pub fn delete(mut self) -> Builder<Finish> {
+        self.headers
+            .insert("Prefer", HeaderValue::from_static("return=representation"));
+        Builder {
+            method: Method::DELETE,
+            url: self.url,
+            schema: self.schema,
+            queries: self.queries,
+            headers: self.headers,
+            body: self.body,
+            is_rpc: self.is_rpc,
+            stage: marker::PhantomData,
+        }
+    }
+}
+
+impl Builder<Finish> {
+    /// Executes the PostgREST request.
+    pub async fn execute(mut self) -> Result<Response, Error> {
+        if let Some(schema) = self.schema {
+            let key = if let Method::GET | Method::HEAD = self.method {
+                "Accept-Profile"
+            } else {
+                "Content-Profile"
+            };
+
+            self.headers
+                .insert(key, HeaderValue::from_str(&schema).unwrap());
+        }
+
+        if self.method != Method::GET && self.method != Method::HEAD {
+            self.headers
+                .insert("Content-Type", HeaderValue::from_static("application/json"));
+        }
+
+        let mut req = Client::new()
+            .request(self.method.clone(), &self.url)
+            .headers(self.headers)
+            .query(&self.queries);
+
+        if let Some(body) = self.body {
+            req = req.body(body);
+        }
+
+        req.send().await
+    }
+}
+
+// TODO: Test Unicode support
+impl<Stage> Builder<Stage> {
+    /// Authenticates the request with JWT.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("table")
+    ///     .auth("supers.ecretjw.ttoken");
+    /// ```
+    pub fn auth<T>(mut self, token: T) -> Self
+    where
+        T: AsRef<str>,
+    {
+        self.headers.insert(
+            "Authorization",
+            HeaderValue::from_str(&format!("Bearer {}", token.as_ref())).unwrap(),
+        );
         self
     }
 
@@ -221,6 +399,7 @@ impl Builder {
         self
     }
 
+    #[doc(hidden)]
     fn count(mut self, method: &str) -> Self {
         self.headers
             .insert("Range-Unit", HeaderValue::from_static("items"));
@@ -308,139 +487,22 @@ impl Builder {
         self
     }
 
-    /// Performs an INSERT of the `body` (in JSON) into the table.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use postgrest::Postgrest;
-    ///
-    /// let client = Postgrest::new("https://your.postgrest.endpoint");
-    /// client
-    ///     .from("users")
-    ///     .insert(r#"[{ "username": "soedirgo", "status": "online" },
-    ///                 { "username": "jose", "status": "offline" }]"#);
-    /// ```
-    pub fn insert<T>(mut self, body: T) -> Self
-    where
-        T: Into<String>,
-    {
-        self.method = Method::POST;
-        self.headers
-            .insert("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.into());
-        self
-    }
-
-    /// Performs an upsert of the `body` (in JSON) into the table.
-    ///
-    /// # Note
-    ///
-    /// This merges duplicates by default. Ignoring duplicates is possible via
-    /// PostgREST, but is currently unsupported.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use postgrest::Postgrest;
-    ///
-    /// let client = Postgrest::new("https://your.postgrest.endpoint");
-    /// client
-    ///     .from("users")
-    ///     .upsert(r#"[{ "username": "soedirgo", "status": "online" },
-    ///                 { "username": "jose", "status": "offline" }]"#);
-    /// ```
-    pub fn upsert<T>(mut self, body: T) -> Self
-    where
-        T: Into<String>,
-    {
-        self.method = Method::POST;
-        self.headers.insert(
-            "Prefer",
-            HeaderValue::from_static("return=representation,resolution=merge-duplicates"),
-        );
-        self.body = Some(body.into());
-        self
-    }
-
-    /// Performs an UPDATE using the `body` (in JSON) on the table.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use postgrest::Postgrest;
-    ///
-    /// let client = Postgrest::new("https://your.postgrest.endpoint");
-    /// client
-    ///     .from("users")
-    ///     .eq("username", "soedirgo")
-    ///     .update(r#"{ "status": "offline" }"#);
-    /// ```
-    pub fn update<T>(mut self, body: T) -> Self
-    where
-        T: Into<String>,
-    {
-        self.method = Method::PATCH;
-        self.headers
-            .insert("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.into());
-        self
-    }
-
-    /// Performs a DELETE on the table.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use postgrest::Postgrest;
-    ///
-    /// let client = Postgrest::new("https://your.postgrest.endpoint");
-    /// client
-    ///     .from("users")
-    ///     .eq("username", "soedirgo")
-    ///     .delete();
-    /// ```
-    pub fn delete(mut self) -> Self {
-        self.method = Method::DELETE;
-        self.headers
-            .insert("Prefer", HeaderValue::from_static("return=representation"));
-        self
-    }
-
     /// Performs a stored procedure call. This should only be used through the
     /// `rpc()` method in `Postgrest`.
-    pub fn rpc<T>(mut self, params: T) -> Self
+    pub(super) fn rpc<T>(self, params: T) -> Builder<Finish>
     where
         T: Into<String>,
     {
-        self.method = Method::POST;
-        self.body = Some(params.into());
-        self.is_rpc = true;
-        self
-    }
-
-    /// Executes the PostgREST request.
-    pub async fn execute(mut self) -> Result<Response, Error> {
-        let mut req = Client::new().request(self.method.clone(), &self.url);
-        if let Some(schema) = self.schema {
-            let key = if self.method == Method::GET || self.method == Method::HEAD {
-                "Accept-Profile"
-            } else {
-                "Content-Profile"
-            };
-            self.headers
-                .insert(key, HeaderValue::from_str(&schema).unwrap());
+        Builder {
+            method: Method::POST,
+            url: self.url,
+            schema: self.schema,
+            queries: self.queries,
+            headers: self.headers,
+            body: Some(params.into()),
+            is_rpc: true,
+            stage: marker::PhantomData,
         }
-        if self.method != Method::GET && self.method != Method::HEAD {
-            self.headers
-                .insert("Content-Type", HeaderValue::from_static("application/json"));
-        }
-        req = req.headers(self.headers).query(&self.queries);
-        if let Some(body) = self.body {
-            req = req.body(body);
-        }
-
-        req.send().await
     }
 }
 
@@ -453,7 +515,7 @@ mod tests {
 
     #[test]
     fn only_accept_json() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new());
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new()).select("ds");
         assert_eq!(
             builder.headers.get("Accept").unwrap(),
             HeaderValue::from_static("application/json")
