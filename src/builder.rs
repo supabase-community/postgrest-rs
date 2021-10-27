@@ -9,14 +9,14 @@ pub enum Start {}
 pub enum Finish {}
 
 pub struct Builder<Stage = Start> {
-    pub(crate) method: Method,
+    method: Method,
     url: String,
     schema: Option<String>,
     // Need this to allow access from `filter.rs`
     pub(super) queries: Vec<(String, String)>,
     headers: HeaderMap,
-    pub(crate) body: Option<String>,
-    pub(crate) is_rpc: bool,
+    body: Option<String>,
+    is_rpc: bool,
     stage: marker::PhantomData<Stage>,
 }
 
