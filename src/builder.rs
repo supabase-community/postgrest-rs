@@ -3,7 +3,8 @@ use reqwest::{
     Client, Error, Method, Response,
 };
 
-pub struct Builder {
+/// QueryBuilder struct
+pub struct Builder<'a> {
     method: Method,
     url: String,
     schema: Option<String>,
@@ -12,12 +13,15 @@ pub struct Builder {
     headers: HeaderMap,
     body: Option<String>,
     is_rpc: bool,
+    // sharing a client is a good idea, performance wise
+    // the client has to live at least as much as the builder
+    client: &'a Client,
 }
 
 // TODO: Test Unicode support
-impl Builder {
+impl<'a> Builder<'a> {
     /// Creates a new `Builder` with the specified `schema`.
-    pub fn new<T>(url: T, schema: Option<String>, headers: HeaderMap) -> Self
+    pub fn new<T>(url: T, schema: Option<String>, headers: HeaderMap, client: &'a Client) -> Self
     where
         T: Into<String>,
     {
@@ -29,6 +33,7 @@ impl Builder {
             headers,
             body: None,
             is_rpc: false,
+            client,
         };
         builder
             .headers
@@ -421,26 +426,31 @@ impl Builder {
 
     /// Executes the PostgREST request.
     pub async fn execute(mut self) -> Result<Response, Error> {
-        let mut req = Client::new().request(self.method.clone(), &self.url);
-        if let Some(schema) = self.schema {
-            let key = if self.method == Method::GET || self.method == Method::HEAD {
-                "Accept-Profile"
-            } else {
-                "Content-Profile"
-            };
-            self.headers
-                .insert(key, HeaderValue::from_str(&schema).unwrap());
-        }
-        if self.method != Method::GET && self.method != Method::HEAD {
-            self.headers
-                .insert("Content-Type", HeaderValue::from_static("application/json"));
-        }
-        req = req.headers(self.headers).query(&self.queries);
-        if let Some(body) = self.body {
-            req = req.body(body);
-        }
-
-        req.send().await
+        match self.schema {
+            Some(schema) => {
+                let key = match self.method {
+                    Method::GET | Method::HEAD => "Accept-Profile",
+                    _ => "Content-Profile",
+                };
+                self.headers
+                    .insert(key, HeaderValue::from_str(&schema).unwrap());
+            }
+            None => {}
+        };
+        match self.method {
+            Method::GET | Method::HEAD => {}
+            _ => {
+                self.headers
+                    .insert("Content-Type", HeaderValue::from_static("application/json"));
+            }
+        };
+        self.client
+            .request(self.method, self.url)
+            .headers(self.headers)
+            .query(&self.queries)
+            .body(self.body.unwrap_or("".to_string()))
+            .send()
+            .await
     }
 }
 
@@ -453,7 +463,8 @@ mod tests {
 
     #[test]
     fn only_accept_json() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new());
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client);
         assert_eq!(
             builder.headers.get("Accept").unwrap(),
             HeaderValue::from_static("application/json")
@@ -462,7 +473,8 @@ mod tests {
 
     #[test]
     fn auth_with_token() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new()).auth("$Up3rS3crET");
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).auth("$Up3rS3crET");
         assert_eq!(
             builder.headers.get("Authorization").unwrap(),
             HeaderValue::from_static("Bearer $Up3rS3crET")
@@ -471,7 +483,8 @@ mod tests {
 
     #[test]
     fn select_assert_query() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new()).select("some_table");
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).select("some_table");
         assert_eq!(builder.method, Method::GET);
         assert_eq!(
             builder
@@ -483,7 +496,8 @@ mod tests {
 
     #[test]
     fn order_assert_query() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new()).order("id");
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).order("id");
         assert_eq!(
             builder
                 .queries
@@ -494,7 +508,8 @@ mod tests {
 
     #[test]
     fn limit_assert_range_header() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new()).limit(20);
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).limit(20);
         assert_eq!(
             builder.headers.get("Range").unwrap(),
             HeaderValue::from_static("0-19")
@@ -503,7 +518,8 @@ mod tests {
 
     #[test]
     fn range_assert_range_header() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new()).range(10, 20);
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).range(10, 20);
         assert_eq!(
             builder.headers.get("Range").unwrap(),
             HeaderValue::from_static("10-20")
@@ -512,7 +528,8 @@ mod tests {
 
     #[test]
     fn single_assert_accept_header() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new()).single();
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).single();
         assert_eq!(
             builder.headers.get("Accept").unwrap(),
             HeaderValue::from_static("application/vnd.pgrst.object+json")
@@ -521,7 +538,8 @@ mod tests {
 
     #[test]
     fn upsert_assert_prefer_header() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new()).upsert("ignored");
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).upsert("ignored");
         assert_eq!(
             builder.headers.get("Prefer").unwrap(),
             HeaderValue::from_static("return=representation,resolution=merge-duplicates")
@@ -530,20 +548,24 @@ mod tests {
 
     #[test]
     fn not_rpc_should_not_have_flag() {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new()).select("ignored");
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).select("ignored");
         assert_eq!(builder.is_rpc, false);
     }
 
     #[test]
     fn rpc_should_have_body_and_flag() {
-        let builder = Builder::new(RPC_URL, None, HeaderMap::new()).rpc("{\"a\": 1, \"b\": 2}");
+        let client = Client::new();
+        let builder =
+            Builder::new(RPC_URL, None, HeaderMap::new(), &client).rpc("{\"a\": 1, \"b\": 2}");
         assert_eq!(builder.body.unwrap(), "{\"a\": 1, \"b\": 2}");
         assert_eq!(builder.is_rpc, true);
     }
 
     #[test]
     fn chain_filters() -> Result<(), Box<dyn std::error::Error>> {
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new())
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client)
             .eq("username", "supabot")
             .neq("message", "hello world")
             .gte("channel_id", "1")
