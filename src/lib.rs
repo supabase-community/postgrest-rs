@@ -79,11 +79,13 @@ mod filter;
 
 pub use builder::Builder;
 use reqwest::header::{HeaderMap, HeaderValue, IntoHeaderName};
+use reqwest::Client;
 
 pub struct Postgrest {
     url: String,
     schema: Option<String>,
     headers: HeaderMap,
+    client: Client,
 }
 
 impl Postgrest {
@@ -104,6 +106,7 @@ impl Postgrest {
             url: url.into(),
             schema: None,
             headers: HeaderMap::new(),
+            client: Client::new(),
         }
     }
 
@@ -129,7 +132,7 @@ impl Postgrest {
         self
     }
 
-    /// Add arbitrary headers to the request.  For instance when you may want to connect
+    /// Add arbitrary headers to the request. For instance when you may want to connect
     /// through an API gateway that needs an API key header.
     ///
     /// # Example
@@ -168,7 +171,7 @@ impl Postgrest {
         T: AsRef<str>,
     {
         let url = format!("{}/{}", self.url, table.as_ref());
-        Builder::new(url, self.schema.clone(), self.headers.clone())
+        Builder::new(url, self.schema.clone(), self.headers.clone(), &self.client)
     }
 
     /// Perform a stored procedure call.
@@ -187,7 +190,7 @@ impl Postgrest {
         U: Into<String>,
     {
         let url = format!("{}/rpc/{}", self.url, function.as_ref());
-        Builder::new(url, self.schema.clone(), self.headers.clone()).rpc(params)
+        Builder::new(url, self.schema.clone(), self.headers.clone(), &self.client).rpc(params)
     }
 }
 
