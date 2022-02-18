@@ -426,17 +426,14 @@ impl<'a> Builder<'a> {
 
     /// Executes the PostgREST request.
     pub async fn execute(mut self) -> Result<Response, Error> {
-        match self.schema {
-            Some(schema) => {
-                let key = match self.method {
-                    Method::GET | Method::HEAD => "Accept-Profile",
-                    _ => "Content-Profile",
-                };
-                self.headers
-                    .insert(key, HeaderValue::from_str(&schema).unwrap());
-            }
-            None => {}
-        };
+        if let Some(schema) = self.schema {
+            let key = match self.method {
+                Method::GET | Method::HEAD => "Accept-Profile",
+                _ => "Content-Profile",
+            };
+            self.headers
+                .insert(key, HeaderValue::from_str(&schema).unwrap());
+        }
         match self.method {
             Method::GET | Method::HEAD => {}
             _ => {
@@ -448,7 +445,7 @@ impl<'a> Builder<'a> {
             .request(self.method, self.url)
             .headers(self.headers)
             .query(&self.queries)
-            .body(self.body.unwrap_or("".to_string()))
+            .body(self.body.unwrap_or_default())
             .send()
             .await
     }
