@@ -13,7 +13,7 @@ Add this to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-postgrest = "1.0"
+postgrest = "1.1.1"
 ```
 
 Simple example:
@@ -74,7 +74,7 @@ let body = resp
 use postgrest::Postgrest;
 use dotenv;
 
-dotenv::dotenv().ok(); 
+dotenv::dotenv().ok();
 
 let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/")
     .insert_header(
@@ -92,7 +92,7 @@ let body = resp
 
 ### Building Queries
 
-These examples assume you've already initialized the client.  The methods `.from()` and `.rpc()` initalizes the query builder inside the client.
+These examples assume you've already initialized the client. The methods `.from()` and `.rpc()` initalizes the query builder inside the client.
 
 Using filters:
 
