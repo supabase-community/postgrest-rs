@@ -2,6 +2,7 @@ use reqwest::{
     header::{HeaderMap, HeaderValue},
     Client, Error, Method, Response,
 };
+use serde::Serialize;
 
 /// QueryBuilder struct
 pub struct Builder<'a> {
@@ -334,6 +335,15 @@ impl<'a> Builder<'a> {
         self.headers
             .insert("Prefer", HeaderValue::from_static("return=representation"));
         self.body = Some(body.into());
+        self
+    }
+
+    pub fn insert_json<T>(mut self, body: T) -> Self
+    where T: Serialize, {
+        self.method = Method::POST;
+        self.headers
+            .insert("Prefer", HeaderValue::from_static("return=representation"));
+        self.body = Some(serde_json::to_string(&body).unwrap());
         self
     }
 
