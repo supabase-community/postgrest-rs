@@ -368,6 +368,38 @@ impl<'a> Builder<'a> {
         self
     }
 
+    /// Resolve upsert conflicts on unique columns other than the primary key.
+    ///
+    /// # Note
+    ///
+    /// This informs PostgREST to resolve upsert conflicts through an
+    /// alternative, unique index other than the primary key of the table.
+    /// See the related
+    /// [PostgREST documentation](https://postgrest.org/en/stable/api.html?highlight=upsert#on-conflict).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// // Suppose `users` are keyed an SERIAL primary key,
+    /// // but have a unique index on `username`.
+    /// client
+    ///     .from("users")
+    ///     .upsert(r#"[{ "username": "soedirgo", "status": "online" },
+    ///                 { "username": "jose", "status": "offline" }]"#)
+    ///     .on_conflict("username");
+    /// ```
+    pub fn on_conflict<T>(mut self, columns: T) -> Self
+    where
+        T: Into<String>,
+    {
+        self.queries
+            .push(("on_conflict".to_string(), columns.into()));
+        self
+    }
+
     /// Performs an UPDATE using the `body` (in JSON) on the table.
     ///
     /// # Example
