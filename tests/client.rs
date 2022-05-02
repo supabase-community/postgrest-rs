@@ -80,6 +80,7 @@ async fn upsert_existing() -> Result<(), Box<dyn Error>> {
     let resp = client
         .from("users")
         .upsert(r#"{"username": "dragarcia", "status": "ONLINE"}"#)
+        .on_conflict("username")
         .execute()
         .await?;
     let body = resp.text().await?;
