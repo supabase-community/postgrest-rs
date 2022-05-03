@@ -153,7 +153,6 @@ impl<'a> Builder<'a> {
     where
         T: Into<String>,
     {
-        self.method = Method::GET;
         self.queries.push(("select".to_string(), columns.into()));
         self
     }
@@ -547,8 +546,8 @@ impl<'a> Builder<'a> {
         self
     }
 
-    /// Executes the PostgREST request.
-    pub async fn execute(mut self) -> Result<Response, Error> {
+    /// Build the PostgREST request.
+    pub fn build(mut self) -> reqwest::RequestBuilder {
         if let Some(schema) = self.schema {
             let key = match self.method {
                 Method::GET | Method::HEAD => "Accept-Profile",
@@ -569,8 +568,11 @@ impl<'a> Builder<'a> {
             .headers(self.headers)
             .query(&self.queries)
             .body(self.body.unwrap_or_default())
-            .send()
-            .await
+    }
+
+    /// Executes the PostgREST request.
+    pub async fn execute(self) -> Result<Response, Error> {
+        self.build().send().await
     }
 }
 
