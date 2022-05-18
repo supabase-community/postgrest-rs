@@ -11,13 +11,8 @@ keywords = ["postgres", "postgrest", "rest", "api"]
 categories = ["development-tools"]
 edition = "2018"
 
-[features]
-default = ["rustls-tls"]
-native-tls = ["reqwest/native-tls"]
-rustls-tls = ["reqwest/rustls-tls"]
-
 [dependencies]
-reqwest = { version = "0.11", default-features = false, features = ["json"] }
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
 
 [dev-dependencies]
 json = "0.12"
