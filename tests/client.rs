@@ -22,6 +22,41 @@ async fn basic_data() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+async fn special_characters_eq() -> Result<(), Box<dyn Error>> {
+    let client = Postgrest::new(REST_URL);
+    let resp = client
+        .from("users")
+        .select("username")
+        .eq("username", "ihave.special,c:haracter(s)")
+        .execute()
+        .await?;
+    let body = resp.text().await?;
+    let body = json::parse(&body)?;
+
+    assert_eq!(body[0]["username"], "ihave.special,c:haracter(s)");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn special_characters_neq() -> Result<(), Box<dyn Error>> {
+    let client = Postgrest::new(REST_URL);
+    let resp = client
+        .from("users")
+        .select("username")
+        .neq("username", "ihave.special,c:haracter(s)")
+        .and("catchphrase.eq.fat bat")
+        .execute()
+        .await?;
+    let body = resp.text().await?;
+    let body = json::parse(&body)?;
+
+    assert!(body.is_empty());
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn relational_join() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL);
     let resp = client
