@@ -132,7 +132,7 @@ impl Builder<'_> {
     {
         self.queries.push((
             clean_param(column.as_ref()).into(),
-            format!("eq.{}", clean_param(filter.as_ref())),
+            format!("eq.{}", filter.as_ref()),
         ));
         self
     }
@@ -162,7 +162,7 @@ impl Builder<'_> {
     {
         self.queries.push((
             clean_param(column.as_ref()).into(),
-            format!("neq.{}", clean_param(filter.as_ref())),
+            format!("neq.{}", filter.as_ref()),
         ));
         self
     }
