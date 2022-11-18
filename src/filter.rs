@@ -4,7 +4,7 @@ use crate::Builder;
 
 fn clean_param(param: &str) -> Cow<str> {
     if ",.:()".chars().any(|c| param.contains(c)) {
-        format!("\"{}\"", param).into()
+        format!("{}", param).into()
     } else {
         param.into()
     }
