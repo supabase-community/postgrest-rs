@@ -1,14 +1,4 @@
-use std::borrow::Cow;
-
 use crate::Builder;
-
-fn clean_param(param: &str) -> Cow<str> {
-    if ",.:()".chars().any(|c| param.contains(c)) {
-        format!("{}", param).into()
-    } else {
-        param.into()
-    }
-}
 
 impl Builder<'_> {
     /// Finds all rows which doesn't satisfy the filter.
@@ -35,8 +25,8 @@ impl Builder<'_> {
         V: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column.as_ref()).into(),
-            format!("not.{}.{}", operator.as_ref(), clean_param(filter.as_ref())),
+            column.as_ref().into(),
+            format!("not.{}.{}", operator.as_ref(), filter.as_ref()),
         ));
         self
     }
@@ -131,7 +121,7 @@ impl Builder<'_> {
         U: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column.as_ref()).into(),
+            column.as_ref().into(),
             format!("eq.{}", filter.as_ref()),
         ));
         self
@@ -161,7 +151,7 @@ impl Builder<'_> {
         U: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column.as_ref()).into(),
+            column.as_ref().into(),
             format!("neq.{}", filter.as_ref()),
         ));
         self
@@ -191,8 +181,8 @@ impl Builder<'_> {
         U: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column.as_ref()).into(),
-            format!("gt.{}", clean_param(filter.as_ref())),
+            column.as_ref().into(),
+            format!("gt.{}", filter.as_ref()),
         ));
         self
     }
@@ -221,8 +211,8 @@ impl Builder<'_> {
         U: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column.as_ref()).into(),
-            format!("gte.{}", clean_param(filter.as_ref())),
+            column.as_ref().into(),
+            format!("gte.{}", filter.as_ref()),
         ));
         self
     }
@@ -251,8 +241,8 @@ impl Builder<'_> {
         U: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column.as_ref()).into(),
-            format!("lt.{}", clean_param(filter.as_ref())),
+            column.as_ref().into(),
+            format!("lt.{}", filter.as_ref()),
         ));
         self
     }
@@ -281,8 +271,8 @@ impl Builder<'_> {
         U: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column.as_ref()).into(),
-            format!("lte.{}", clean_param(filter.as_ref())),
+            column.as_ref().into(),
+            format!("lte.{}", filter.as_ref()),
         ));
         self
     }
@@ -319,7 +309,7 @@ impl Builder<'_> {
     {
         let pattern = pattern.into().replace('%', "*");
         self.queries.push((
-            clean_param(column.as_ref()).into(),
+            column.as_ref().into(),
             format!("like.{}", pattern),
         ));
         self
@@ -357,7 +347,7 @@ impl Builder<'_> {
     {
         let pattern = pattern.into().replace('%', "*");
         self.queries.push((
-            clean_param(column.as_ref()).into(),
+            column.as_ref().into(),
             format!("ilike.{}", pattern),
         ));
         self
@@ -387,8 +377,8 @@ impl Builder<'_> {
         U: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column.as_ref()).into(),
-            format!("is.{}", clean_param(filter.as_ref())),
+            column.as_ref().into(),
+            format!("is.{}", filter.as_ref()),
         ));
         self
     }
@@ -433,10 +423,10 @@ impl Builder<'_> {
     {
         let mut values: String = values
             .into_iter()
-            .fold(String::new(), |a, s| a + &clean_param(s.as_ref()) + ",");
+            .fold(String::new(), |a, s| a + s.as_ref() + ",");
         values.pop();
         self.queries.push((
-            clean_param(column.as_ref()).into(),
+            column.as_ref().into(),
             format!("in.({})", values),
         ));
         self
@@ -466,7 +456,7 @@ impl Builder<'_> {
         U: AsRef<str>,
     {
         self.queries.push((
-            clean_param(column.as_ref()).into(),
+            column.as_ref().into(),
             format!("cs.{}", filter.as_ref()),
         ));
         self
