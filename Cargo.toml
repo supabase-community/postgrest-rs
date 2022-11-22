@@ -1,6 +1,6 @@
 [package]
 name = "postgrest"
-version = "1.3.1"
+version = "1.3.2"
 authors = ["Bobbie Soedirgo <bobbie@soedirgo.dev>"]
 description = "PostgREST client-side library"
 homepage = "https://github.com/supabase/postgrest-rs"
