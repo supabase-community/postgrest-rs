@@ -120,10 +120,8 @@ impl Builder<'_> {
         T: AsRef<str>,
         U: AsRef<str>,
     {
-        self.queries.push((
-            column.as_ref().into(),
-            format!("eq.{}", filter.as_ref()),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("eq.{}", filter.as_ref())));
         self
     }
 
@@ -150,10 +148,8 @@ impl Builder<'_> {
         T: AsRef<str>,
         U: AsRef<str>,
     {
-        self.queries.push((
-            column.as_ref().into(),
-            format!("neq.{}", filter.as_ref()),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("neq.{}", filter.as_ref())));
         self
     }
 
@@ -180,10 +176,8 @@ impl Builder<'_> {
         T: AsRef<str>,
         U: AsRef<str>,
     {
-        self.queries.push((
-            column.as_ref().into(),
-            format!("gt.{}", filter.as_ref()),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("gt.{}", filter.as_ref())));
         self
     }
 
@@ -210,10 +204,8 @@ impl Builder<'_> {
         T: AsRef<str>,
         U: AsRef<str>,
     {
-        self.queries.push((
-            column.as_ref().into(),
-            format!("gte.{}", filter.as_ref()),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("gte.{}", filter.as_ref())));
         self
     }
 
@@ -240,10 +232,8 @@ impl Builder<'_> {
         T: AsRef<str>,
         U: AsRef<str>,
     {
-        self.queries.push((
-            column.as_ref().into(),
-            format!("lt.{}", filter.as_ref()),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("lt.{}", filter.as_ref())));
         self
     }
 
@@ -270,10 +260,8 @@ impl Builder<'_> {
         T: AsRef<str>,
         U: AsRef<str>,
     {
-        self.queries.push((
-            column.as_ref().into(),
-            format!("lte.{}", filter.as_ref()),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("lte.{}", filter.as_ref())));
         self
     }
 
@@ -308,10 +296,8 @@ impl Builder<'_> {
         U: Into<String>,
     {
         let pattern = pattern.into().replace('%', "*");
-        self.queries.push((
-            column.as_ref().into(),
-            format!("like.{}", pattern),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("like.{}", pattern)));
         self
     }
 
@@ -346,10 +332,8 @@ impl Builder<'_> {
         U: Into<String>,
     {
         let pattern = pattern.into().replace('%', "*");
-        self.queries.push((
-            column.as_ref().into(),
-            format!("ilike.{}", pattern),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("ilike.{}", pattern)));
         self
     }
 
@@ -376,10 +360,8 @@ impl Builder<'_> {
         T: AsRef<str>,
         U: AsRef<str>,
     {
-        self.queries.push((
-            column.as_ref().into(),
-            format!("is.{}", filter.as_ref()),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("is.{}", filter.as_ref())));
         self
     }
 
@@ -425,10 +407,8 @@ impl Builder<'_> {
             .into_iter()
             .fold(String::new(), |a, s| a + s.as_ref() + ",");
         values.pop();
-        self.queries.push((
-            column.as_ref().into(),
-            format!("in.({})", values),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("in.({})", values)));
         self
     }
 
@@ -455,10 +435,8 @@ impl Builder<'_> {
         T: AsRef<str>,
         U: AsRef<str>,
     {
-        self.queries.push((
-            column.as_ref().into(),
-            format!("cs.{}", filter.as_ref()),
-        ));
+        self.queries
+            .push((column.as_ref().into(), format!("cs.{}", filter.as_ref())));
         self
     }
 
