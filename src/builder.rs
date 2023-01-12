@@ -190,12 +190,12 @@ impl<'a> Builder<'a> {
     /// client
     ///     .from("countries")
     ///     .select("name, cities(name)")
-    ///     .order_with_options("name", "cities", true, false);
+    ///     .order_with_options("name", Some("cities"), true, false);
     /// ```
     pub fn order_with_options<T, U>(
         mut self,
         columns: T,
-        foreign_table: U,
+        foreign_table: Option<U>,
         ascending: bool,
         nulls_first: bool,
     ) -> Self
@@ -204,9 +204,11 @@ impl<'a> Builder<'a> {
         U: Into<String>,
     {
         let mut key = "order".to_string();
-        let foreign_table = foreign_table.into();
-        if !foreign_table.is_empty() {
-            key = format!("{}.order", foreign_table);
+        if let Some(foreign_table) = foreign_table {
+            let foreign_table = foreign_table.into();
+            if !foreign_table.is_empty() {
+                key = format!("{}.order", foreign_table);
+            }
         }
 
         let mut ascending_string = "desc";
@@ -628,7 +630,7 @@ mod tests {
     fn order_with_options_assert_query() {
         let client = Client::new();
         let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client)
-            .order_with_options("name", "cities", true, false);
+            .order_with_options("name", Some("cities"), true, false);
         assert_eq!(
             builder
                 .queries
