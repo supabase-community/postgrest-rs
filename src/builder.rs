@@ -18,6 +18,15 @@ pub struct Builder<'a> {
     client: &'a Client,
 }
 
+pub struct OrderOptions<T>
+where
+    T: Into<String>,
+{
+    ascending: bool,
+    nulls_first: bool,
+    foreign_table: T,
+}
+
 // TODO: Test Unicode support
 impl<'a> Builder<'a> {
     /// Creates a new `Builder` with the specified `schema`.
@@ -184,21 +193,65 @@ impl<'a> Builder<'a> {
     /// # Example
     ///
     /// ```
-    /// use postgrest::Postgrest;
+    /// use postgrest::{Postgrest, OrderOptions};
     ///
     /// let client = Postgrest::new("https://your.postgrest.endpoint");
     /// client
     ///     .from("countries")
     ///     .select("name, cities(name)")
-    ///     .foreign_table_order("name.desc", "cities");
+    ///     .order_with_options("name",
+    ///         OrderOptions {
+    ///             ascending: true,
+    ///             nulls_first: false,
+    ///             foreign_table: "cities",
+    ///         },
+    ///     );
     /// ```
-    pub fn foreign_table_order<T, U>(mut self, columns: T, foreign_table: U) -> Self
+    pub fn order_with_options<T, U>(mut self, columns: T, options: OrderOptions<U>) -> Self
     where
         T: Into<String>,
         U: Into<String>,
     {
-        self.queries
-            .push((format!("{}.order", foreign_table.into()), columns.into()));
+        let mut key = "order".to_string();
+        let foreign_table = options.foreign_table.into();
+        if !foreign_table.is_empty() {
+            key = format!("{}.order", foreign_table);
+        }
+
+        let mut ascending_string = "desc";
+        if options.ascending {
+            ascending_string = "asc";
+        }
+
+        let mut nulls_first_string = "nullslast";
+        if options.nulls_first {
+            nulls_first_string = "nullsfirst";
+        }
+
+        let existing_order = self.queries.iter().find(|(k, _)| k == &key);
+        match existing_order {
+            Some((_, v)) => {
+                let new_order = format!(
+                    "{},{}.{}.{}",
+                    v,
+                    columns.into(),
+                    ascending_string,
+                    nulls_first_string
+                );
+                self.queries.push((key, new_order));
+            }
+            None => {
+                self.queries.push((
+                    key,
+                    format!(
+                        "{}.{}.{}",
+                        columns.into(),
+                        ascending_string,
+                        nulls_first_string
+                    ),
+                ));
+            }
+        }
         self
     }
 
@@ -581,14 +634,20 @@ mod tests {
     }
 
     #[test]
-    fn foreign_table_order_assert_query() {
+    fn order_with_options_assert_query() {
         let client = Client::new();
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client)
-            .foreign_table_order("name", "cities");
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).order_with_options(
+            "name",
+            OrderOptions {
+                ascending: true,
+                nulls_first: false,
+                foreign_table: "cities",
+            },
+        );
         assert_eq!(
             builder
                 .queries
-                .contains(&("cities.order".to_string(), "name".to_string())),
+                .contains(&("cities.order".to_string(), "name.asc.nullslast".to_string())),
             true
         );
     }

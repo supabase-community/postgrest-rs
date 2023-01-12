@@ -78,6 +78,7 @@ mod builder;
 mod filter;
 
 pub use builder::Builder;
+pub use builder::OrderOptions;
 use reqwest::header::{HeaderMap, HeaderValue, IntoHeaderName};
 use reqwest::Client;
 
