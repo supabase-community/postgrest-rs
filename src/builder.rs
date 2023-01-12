@@ -567,6 +567,19 @@ mod tests {
     }
 
     #[test]
+    fn foreign_table_limit_assert_query() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client)
+            .foreign_table_limit(20, "some_table");
+        assert_eq!(
+            builder
+                .queries
+                .contains(&("some_table.limit".to_string(), "20".to_string())),
+            true
+        );
+    }
+
+    #[test]
     fn range_assert_range_header() {
         let client = Client::new();
         let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).range(10, 20);
