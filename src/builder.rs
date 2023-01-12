@@ -18,15 +18,6 @@ pub struct Builder<'a> {
     client: &'a Client,
 }
 
-pub struct OrderOptions<T>
-where
-    T: Into<String>,
-{
-    ascending: bool,
-    nulls_first: bool,
-    foreign_table: T,
-}
-
 // TODO: Test Unicode support
 impl<'a> Builder<'a> {
     /// Creates a new `Builder` with the specified `schema`.
@@ -193,38 +184,38 @@ impl<'a> Builder<'a> {
     /// # Example
     ///
     /// ```
-    /// use postgrest::{Postgrest, OrderOptions};
+    /// use postgrest::Postgrest;
     ///
     /// let client = Postgrest::new("https://your.postgrest.endpoint");
     /// client
     ///     .from("countries")
     ///     .select("name, cities(name)")
-    ///     .order_with_options("name",
-    ///         OrderOptions {
-    ///             ascending: true,
-    ///             nulls_first: false,
-    ///             foreign_table: "cities",
-    ///         },
-    ///     );
+    ///     .order_with_options("name", "cities", true, false);
     /// ```
-    pub fn order_with_options<T, U>(mut self, columns: T, options: OrderOptions<U>) -> Self
+    pub fn order_with_options<T, U>(
+        mut self,
+        columns: T,
+        foreign_table: U,
+        ascending: bool,
+        nulls_first: bool,
+    ) -> Self
     where
         T: Into<String>,
         U: Into<String>,
     {
         let mut key = "order".to_string();
-        let foreign_table = options.foreign_table.into();
+        let foreign_table = foreign_table.into();
         if !foreign_table.is_empty() {
             key = format!("{}.order", foreign_table);
         }
 
         let mut ascending_string = "desc";
-        if options.ascending {
+        if ascending {
             ascending_string = "asc";
         }
 
         let mut nulls_first_string = "nullslast";
-        if options.nulls_first {
+        if nulls_first {
             nulls_first_string = "nullsfirst";
         }
 
@@ -636,14 +627,8 @@ mod tests {
     #[test]
     fn order_with_options_assert_query() {
         let client = Client::new();
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).order_with_options(
-            "name",
-            OrderOptions {
-                ascending: true,
-                nulls_first: false,
-                foreign_table: "cities",
-            },
-        );
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client)
+            .order_with_options("name", "cities", true, false);
         assert_eq!(
             builder
                 .queries
