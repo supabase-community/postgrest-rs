@@ -179,6 +179,29 @@ impl<'a> Builder<'a> {
         self
     }
 
+    /// Orders the result of a foreign table with the specified `columns`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("countries")
+    ///     .select("name, cities(name)")
+    ///     .foreign_table_order("name.desc", "cities");
+    /// ```
+    pub fn foreign_table_order<T, U>(mut self, columns: T, foreign_table: U) -> Self
+    where
+        T: Into<String>,
+        U: Into<String>,
+    {
+        self.queries
+            .push((format!("{}.order", foreign_table.into()), columns.into()));
+        self
+    }
+
     /// Limits the result with the specified `count`.
     ///
     /// # Example
@@ -553,6 +576,19 @@ mod tests {
             builder
                 .queries
                 .contains(&("order".to_string(), "id".to_string())),
+            true
+        );
+    }
+
+    #[test]
+    fn foreign_table_order_assert_query() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client)
+            .foreign_table_order("name", "cities");
+        assert_eq!(
+            builder
+                .queries
+                .contains(&("cities.order".to_string(), "name".to_string())),
             true
         );
     }
