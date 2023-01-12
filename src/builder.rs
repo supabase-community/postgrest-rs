@@ -202,6 +202,28 @@ impl<'a> Builder<'a> {
         self
     }
 
+    /// Limits the result of a foreign table with the specified `count`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("countries")
+    ///     .select("name, cities(name)")
+    ///     .foreign_table_limit(1, "cities");
+    /// ```
+    pub fn foreign_table_limit<T>(mut self, count: usize, foreign_table: T) -> Self
+    where
+        T: Into<String>,
+    {
+        self.queries
+            .push((format!("{}.limit", foreign_table.into()), count.to_string()));
+        self
+    }
+
     /// Limits the result to rows within the specified range, inclusive.
     ///
     /// # Example
@@ -542,6 +564,19 @@ mod tests {
         assert_eq!(
             builder.headers.get("Range").unwrap(),
             HeaderValue::from_static("0-19")
+        );
+    }
+
+    #[test]
+    fn foreign_table_limit_assert_query() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client)
+            .foreign_table_limit(20, "some_table");
+        assert_eq!(
+            builder
+                .queries
+                .contains(&("some_table.limit".to_string(), "20".to_string())),
+            true
         );
     }
 
