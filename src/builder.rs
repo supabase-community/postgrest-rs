@@ -629,8 +629,12 @@ mod tests {
     #[test]
     fn order_with_options_assert_query() {
         let client = Client::new();
-        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client)
-            .order_with_options("name", Some("cities"), true, false);
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).order_with_options(
+            "name",
+            Some("cities"),
+            true,
+            false,
+        );
         assert_eq!(
             builder
                 .queries
