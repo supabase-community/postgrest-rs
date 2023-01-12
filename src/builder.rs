@@ -201,6 +201,27 @@ impl<'a> Builder<'a> {
         );
         self
     }
+    
+    /// Limits the result of a foreign table with the specified `count`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("countries")
+    ///     .select("name, cities(name)")
+    ///     .foreign_table_limit(1, "cities");
+    /// ```
+    pub fn foreign_table_limit<T>(mut self, count: usize, foreign_table: T) -> Self
+    where
+        T: Into<String>,
+        {
+            self.queries.push((format!("{}.limit", foreign_table.into()), count.to_string()));
+        self
+    }
 
     /// Limits the result to rows within the specified range, inclusive.
     ///
