@@ -201,7 +201,7 @@ impl<'a> Builder<'a> {
         );
         self
     }
-    
+
     /// Limits the result of a foreign table with the specified `count`.
     ///
     /// # Example
@@ -218,8 +218,9 @@ impl<'a> Builder<'a> {
     pub fn foreign_table_limit<T>(mut self, count: usize, foreign_table: T) -> Self
     where
         T: Into<String>,
-        {
-            self.queries.push((format!("{}.limit", foreign_table.into()), count.to_string()));
+    {
+        self.queries
+            .push((format!("{}.limit", foreign_table.into()), count.to_string()));
         self
     }
 
