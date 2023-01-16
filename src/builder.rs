@@ -179,6 +179,75 @@ impl<'a> Builder<'a> {
         self
     }
 
+    /// Orders the result of a foreign table with the specified `columns`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("countries")
+    ///     .select("name, cities(name)")
+    ///     .order_with_options("name", Some("cities"), true, false);
+    /// ```
+    pub fn order_with_options<T, U>(
+        mut self,
+        columns: T,
+        foreign_table: Option<U>,
+        ascending: bool,
+        nulls_first: bool,
+    ) -> Self
+    where
+        T: Into<String>,
+        U: Into<String>,
+    {
+        let mut key = "order".to_string();
+        if let Some(foreign_table) = foreign_table {
+            let foreign_table = foreign_table.into();
+            if !foreign_table.is_empty() {
+                key = format!("{}.order", foreign_table);
+            }
+        }
+
+        let mut ascending_string = "desc";
+        if ascending {
+            ascending_string = "asc";
+        }
+
+        let mut nulls_first_string = "nullslast";
+        if nulls_first {
+            nulls_first_string = "nullsfirst";
+        }
+
+        let existing_order = self.queries.iter().find(|(k, _)| k == &key);
+        match existing_order {
+            Some((_, v)) => {
+                let new_order = format!(
+                    "{},{}.{}.{}",
+                    v,
+                    columns.into(),
+                    ascending_string,
+                    nulls_first_string
+                );
+                self.queries.push((key, new_order));
+            }
+            None => {
+                self.queries.push((
+                    key,
+                    format!(
+                        "{}.{}.{}",
+                        columns.into(),
+                        ascending_string,
+                        nulls_first_string
+                    ),
+                ));
+            }
+        }
+        self
+    }
+
     /// Limits the result with the specified `count`.
     ///
     /// # Example
@@ -553,6 +622,23 @@ mod tests {
             builder
                 .queries
                 .contains(&("order".to_string(), "id".to_string())),
+            true
+        );
+    }
+
+    #[test]
+    fn order_with_options_assert_query() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), &client).order_with_options(
+            "name",
+            Some("cities"),
+            true,
+            false,
+        );
+        assert_eq!(
+            builder
+                .queries
+                .contains(&("cities.order".to_string(), "name.asc.nullslast".to_string())),
             true
         );
     }
