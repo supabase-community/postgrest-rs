@@ -127,7 +127,7 @@ async fn nonexisting_rpc_in_schema() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(
         body["message"],
-        "function personal.nonexistent_procedure(param => text) does not exist"
+        "Could not find the function personal.nonexistent_procedure(param) in the schema cache"
     );
 
     Ok(())
