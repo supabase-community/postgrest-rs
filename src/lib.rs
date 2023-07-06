@@ -171,7 +171,12 @@ impl Postgrest {
         T: AsRef<str>,
     {
         let url = format!("{}/{}", self.url, table.as_ref());
-        Builder::new(url, self.schema.clone(), self.headers.clone(), &self.client)
+        Builder::new(
+            url,
+            self.schema.clone(),
+            self.headers.clone(),
+            self.client.clone(),
+        )
     }
 
     /// Perform a stored procedure call.
@@ -190,7 +195,13 @@ impl Postgrest {
         U: Into<String>,
     {
         let url = format!("{}/rpc/{}", self.url, function.as_ref());
-        Builder::new(url, self.schema.clone(), self.headers.clone(), &self.client).rpc(params)
+        Builder::new(
+            url,
+            self.schema.clone(),
+            self.headers.clone(),
+            self.client.clone(),
+        )
+        .rpc(params)
     }
 }
 

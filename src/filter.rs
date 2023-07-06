@@ -1,6 +1,6 @@
 use crate::Builder;
 
-impl Builder<'_> {
+impl Builder {
     /// Finds all rows which doesn't satisfy the filter.
     ///
     /// # Example
