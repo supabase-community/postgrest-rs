@@ -81,6 +81,7 @@ pub use builder::Builder;
 use reqwest::header::{HeaderMap, HeaderValue, IntoHeaderName};
 use reqwest::Client;
 
+#[derive(Clone)]
 pub struct Postgrest {
     url: String,
     schema: Option<String>,
