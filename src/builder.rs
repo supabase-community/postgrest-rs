@@ -4,7 +4,7 @@ use reqwest::{
 };
 
 /// QueryBuilder struct
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Builder {
     method: Method,
     url: String,
