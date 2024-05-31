@@ -54,7 +54,7 @@ Simplified example using a custom header (e.g. for API gateway authentication wi
 ```rust
 use postgrest::Postgrest;
 
-let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/")
+let client = Postgrest::new("https://your.supabase.endpoint/rest/v1")
     .insert_header("apikey", "ExampleAPIKeyValue"); // EXAMPLE ONLY!
 // Don't actually hard code this value, that's really bad. Use environment
 // variables like with the dotenv(https://crates.io/crates/dotenv) crate to inject
@@ -76,7 +76,7 @@ use dotenv;
 
 dotenv::dotenv().ok(); 
 
-let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/")
+let client = Postgrest::new("https://your.supabase.endpoint/rest/v1")
     .insert_header(
         "apikey",
         dotenv::var("SUPABASE_PUBLIC_API_KEY").unwrap())
