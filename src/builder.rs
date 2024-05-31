@@ -26,9 +26,11 @@ impl Builder {
     where
         T: Into<String>,
     {
+        let url = url.into().trim_end_matches('/').to_string();
+
         let mut builder = Builder {
             method: Method::GET,
-            url: url.into(),
+            url,
             schema,
             queries: Vec::new(),
             headers,
