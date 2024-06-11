@@ -102,7 +102,7 @@ let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/")
     .insert_header(
         "apikey",
         dotenv::var("SUPABASE_PUBLIC_API_KEY").unwrap())
-    .insert_header("Authorization", format!("Bearer {}", SERVICE_KEY))
+    .insert_header("Authorization", format!("Bearer {}", SERVICE_KEY));
 
 let resp = client
     .from("your_table")
