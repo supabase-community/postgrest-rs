@@ -419,14 +419,44 @@ impl Builder {
     ///     .insert(r#"[{ "username": "soedirgo", "status": "online" },
     ///                 { "username": "jose", "status": "offline" }]"#);
     /// ```
-    pub fn insert<T>(mut self, body: T) -> Self
+    #[cfg(not(feature = "serde"))]
+    pub fn insert<T>(self, body: T) -> Self
     where
         T: Into<String>,
     {
+        self.insert_impl(body.into())
+    }
+
+    /// Performs an INSERT of the `body` (in JSON) into the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// #[derive(serde::Serialize)]
+    /// struct MyStruct {}
+    ///
+    /// let my_serializable_struct = MyStruct {};
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .insert(&my_serializable_struct)?;
+    /// ```
+    #[cfg(feature = "serde")]
+    pub fn insert<T>(self, body: &T) -> serde_json::Result<Self>
+    where
+        T: serde::Serialize,
+    {
+        Ok(self.insert_impl(serde_json::to_string(body)?))
+    }
+
+    fn insert_impl(mut self, body: String) -> Self {
         self.method = Method::POST;
         self.headers
             .insert("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.into());
+        self.body = Some(body);
         self
     }
 
@@ -506,14 +536,44 @@ impl Builder {
     ///     .eq("username", "soedirgo")
     ///     .update(r#"{ "status": "offline" }"#);
     /// ```
-    pub fn update<T>(mut self, body: T) -> Self
+    #[cfg(not(feature = "serde"))]
+    pub fn update<T>(self, body: T) -> Self
     where
         T: Into<String>,
     {
+        self.update_impl(body.into())
+    }
+
+    /// Performs an UPDATE using the `body` (in JSON) on the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    /// 
+    /// #[derive(serde::Serialize)]
+    /// struct MyStruct {}
+    ///
+    /// let my_serializable_struct = MyStruct {};
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .eq("username", "soedirgo")
+    ///     .update(&my_serializable_struct)?;
+    /// ```
+    #[cfg(feature = "serde")]
+    pub fn update<T>(self, body: &T) -> serde_json::Result<Self>
+    where
+        T: serde::Serialize {
+        Ok(self.update_impl(serde_json::to_string(body)?))
+    }
+
+    fn update_impl(mut self, body: String) -> Self {
         self.method = Method::PATCH;
         self.headers
             .insert("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.into());
+        self.body = Some(body);
         self
     }
 
