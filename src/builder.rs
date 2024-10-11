@@ -442,7 +442,7 @@ impl Builder {
     /// let client = Postgrest::new("https://your.postgrest.endpoint");
     /// client
     ///     .from("users")
-    ///     .insert(&my_serializable_struct)?;
+    ///     .insert(&my_serializable_struct).unwrap();
     /// ```
     #[cfg(feature = "serde")]
     pub fn insert<T>(self, body: &T) -> serde_json::Result<Self>
@@ -506,7 +506,7 @@ impl Builder {
     /// let client = Postgrest::new("https://your.postgrest.endpoint");
     /// client
     ///     .from("users")
-    ///     .upsert(&my_serializable_struct)?;
+    ///     .upsert(&my_serializable_struct).unwrap();
     /// ```
     #[cfg(feature = "serde")]
     pub fn upsert<T>(self, body: &T) -> serde_json::Result<Self>
@@ -543,11 +543,23 @@ impl Builder {
     /// let client = Postgrest::new("https://your.postgrest.endpoint");
     /// // Suppose `users` are keyed an SERIAL primary key,
     /// // but have a unique index on `username`.
-    /// client
-    ///     .from("users")
-    ///     .upsert(r#"[{ "username": "soedirgo", "status": "online" },
-    ///                 { "username": "jose", "status": "offline" }]"#)
-    ///     .on_conflict("username");
+    #[cfg_attr(not(feature = "serde"), doc = r##"
+     client
+         .from("users")
+         .upsert(r#"[{ "username": "soedirgo", "status": "online" },
+                     { "username": "jose", "status": "offline" }]"#)
+         .on_conflict("username");
+    "##)]
+    #[cfg_attr(feature = "serde", doc = r##"
+     #[derive(serde::Serialize)]
+     struct MyStruct {}
+    
+     let my_serializable_struct = MyStruct {};
+    
+     client
+         .from("users")
+         .upsert(&my_serializable_struct).unwrap();
+    "##)]
     /// ```
     pub fn on_conflict<T>(mut self, columns: T) -> Self
     where
@@ -595,7 +607,7 @@ impl Builder {
     /// client
     ///     .from("users")
     ///     .eq("username", "soedirgo")
-    ///     .update(&my_serializable_struct)?;
+    ///     .update(&my_serializable_struct).unwrap();
     /// ```
     #[cfg(feature = "serde")]
     pub fn update<T>(self, body: &T) -> serde_json::Result<Self>

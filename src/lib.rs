@@ -44,6 +44,7 @@
 //! Updating a table:
 //! ```
 //! # use postgrest::Postgrest;
+//! # #[cfg(not(feature = "serde"))]
 //! # async fn run() -> Result<(), Box<dyn std::error::Error>> {
 //! # let client = Postgrest::new("https://your.postgrest.endpoint");
 //! let resp = client
