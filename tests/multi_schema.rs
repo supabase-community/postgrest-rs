@@ -67,6 +67,43 @@ async fn write_other_schema() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(feature = "serde")]
+async fn write_other_schema_serde() -> Result<(), Box<dyn Error>> {
+    #[derive(serde::Serialize)]
+    struct User {
+        status: String,
+    }
+
+    let client = Postgrest::new(REST_URL);
+    let resp = client
+        .from("users")
+        .select("status")
+        .eq("username", "supabot")
+        .execute()
+        .await?;
+    let body = resp.text().await?;
+    let body = json::parse(&body)?;
+
+    assert_eq!(body[0]["status"], "ONLINE");
+
+    let other_client = Postgrest::new(REST_URL).schema("personal");
+    let other_resp = other_client
+        .from("users")
+        .update(&User {
+            status: "OFFLINE".to_string(),
+        })?
+        .eq("username", "supabot")
+        .execute()
+        .await?;
+    let other_body = other_resp.text().await?;
+    let other_body = json::parse(&other_body)?;
+
+    assert_eq!(other_body[0]["status"], "OFFLINE");
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn read_nonexisting_schema() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL).schema("private");
     let resp = client.from("channels").select("*").execute().await?;
@@ -88,6 +125,34 @@ async fn write_nonexisting_schema() -> Result<(), Box<dyn Error>> {
     let resp = client
         .from("channels")
         .update("{\"slug\": \"private\"}")
+        .eq("slug", "random")
+        .execute()
+        .await?;
+    let body = resp.text().await?;
+    let body = json::parse(&body)?;
+
+    assert_eq!(
+        body["message"],
+        "The schema must be one of the following: public, personal"
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg(feature = "serde")]
+async fn write_nonexisting_schema_serde() -> Result<(), Box<dyn Error>> {
+    #[derive(serde::Serialize)]
+    struct Channel {
+        slug: String,
+    }
+
+    let client = Postgrest::new(REST_URL).schema("private");
+    let resp = client
+        .from("channels")
+        .update(&Channel {
+            slug: "private".to_string(),
+        })?
         .eq("slug", "random")
         .execute()
         .await?;

@@ -91,6 +91,33 @@ async fn insert() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(feature = "serde")]
+async fn insert_serde() -> Result<(), Box<dyn Error>> {
+    #[derive(serde::Serialize)]
+    struct Message {
+        message: String,
+        channel_id: i32,
+        username: String,
+    }
+
+    let client = Postgrest::new(REST_URL);
+    let resp = client
+        .from("messages")
+        .insert(&[Message {
+            message: "Test message 1".to_string(),
+            channel_id: 1,
+            username: "kiwicopple".to_string(),
+        }])?
+        .execute()
+        .await?;
+    let status = resp.status();
+
+    assert_eq!(status.as_u16(), 201);
+
+    Ok(())
+}
+
+#[tokio::test]
 #[cfg(not(feature = "serde"))]
 async fn upsert() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL);
@@ -100,6 +127,39 @@ async fn upsert() -> Result<(), Box<dyn Error>> {
             r#"[{"username": "dragarcia", "status": "OFFLINE"},
                 {"username": "supabot2", "status": "ONLINE"}]"#,
         )
+        .execute()
+        .await?;
+    let body = resp.text().await?;
+    let body = json::parse(&body)?;
+
+    assert_eq!(body[0]["username"], "dragarcia");
+    assert_eq!(body[1]["username"], "supabot2");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg(feature = "serde")]
+async fn upsert_serde() -> Result<(), Box<dyn Error>> {
+    #[derive(serde::Serialize)]
+    struct User {
+        username: String,
+        status: String,
+    }
+
+    let client = Postgrest::new(REST_URL);
+    let resp = client
+        .from("users")
+        .upsert(&[
+            User {
+                username: "dragarcia".to_string(),
+                status: "OFFLINE".to_string(),
+            },
+            User {
+                username: "supabot2".to_string(),
+                status: "ONLINE".to_string(),
+            },
+        ])?
         .execute()
         .await?;
     let body = resp.text().await?;
@@ -131,12 +191,67 @@ async fn upsert_existing() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(feature = "serde")]
+async fn upsert_existing_serde() -> Result<(), Box<dyn Error>> {
+    #[derive(serde::Serialize)]
+    struct User {
+        username: String,
+        status: String,
+    }
+
+    let client = Postgrest::new(REST_URL);
+    let resp = client
+        .from("users")
+        .upsert(&User {
+            username: "dragarcia".to_string(),
+            status: "ONLINE".to_string(),
+        })?
+        .on_conflict("username")
+        .execute()
+        .await?;
+    let body = resp.text().await?;
+    let body = json::parse(&body)?;
+
+    assert_eq!(body[0]["username"], "dragarcia");
+    assert_eq!(body[0]["status"], "ONLINE");
+
+    Ok(())
+}
+
+#[tokio::test]
 #[cfg(not(feature = "serde"))]
 async fn upsert_nonexisting() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL);
     let resp = client
         .from("users")
         .upsert(r#"{"username": "supabot3", "status": "ONLINE"}"#)
+        .execute()
+        .await?;
+    let body = resp.text().await?;
+    let body = json::parse(&body)?;
+
+    assert_eq!(body[0]["username"], "supabot3");
+    assert_eq!(body[0]["status"], "ONLINE");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg(feature = "serde")]
+async fn upsert_nonexisting_serde() -> Result<(), Box<dyn Error>> {
+    #[derive(serde::Serialize)]
+    struct User {
+        username: String,
+        status: String,
+    }
+
+    let client = Postgrest::new(REST_URL);
+    let resp = client
+        .from("users")
+        .upsert(&User {
+            username: "supabot3".to_string(),
+            status: "ONLINE".to_string(),
+        })?
         .execute()
         .await?;
     let body = resp.text().await?;
@@ -156,6 +271,33 @@ async fn update() -> Result<(), Box<dyn Error>> {
         .from("users")
         .eq("status", "ONLINE")
         .update(r#"{"status": "ONLINE"}"#)
+        .execute()
+        .await?;
+    let status = resp.status();
+    let body = resp.text().await?;
+    let body = json::parse(&body)?;
+
+    assert_eq!(status.as_u16(), 200);
+    assert_eq!(body[0]["status"], "ONLINE");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[cfg(feature = "serde")]
+async fn update_serde() -> Result<(), Box<dyn Error>> {
+    #[derive(serde::Serialize)]
+    struct User {
+        status: String,
+    }
+
+    let client = Postgrest::new(REST_URL);
+    let resp = client
+        .from("users")
+        .eq("status", "ONLINE")
+        .update(&User {
+            status: "ONLINE".to_string(),
+        })?
         .execute()
         .await?;
     let status = resp.status();

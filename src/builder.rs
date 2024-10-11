@@ -796,6 +796,19 @@ mod tests {
             HeaderValue::from_static("return=representation,resolution=merge-duplicates")
         );
     }
+    
+    #[test]
+    #[cfg(feature = "serde")]
+    fn upsert_assert_prefer_header_serde() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .upsert(&())
+            .unwrap();
+        assert_eq!(
+            builder.headers.get("Prefer").unwrap(),
+            HeaderValue::from_static("return=representation,resolution=merge-duplicates")
+        );
+    }
 
     #[test]
     fn not_rpc_should_not_have_flag() {
