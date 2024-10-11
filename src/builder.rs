@@ -478,16 +478,51 @@ impl Builder {
     ///     .upsert(r#"[{ "username": "soedirgo", "status": "online" },
     ///                 { "username": "jose", "status": "offline" }]"#);
     /// ```
-    pub fn upsert<T>(mut self, body: T) -> Self
+    #[cfg(not(feature = "serde"))]
+    pub fn upsert<T>(self, body: T) -> Self
     where
         T: Into<String>,
     {
+        self.upsert_impl(body.into())
+    }
+
+    /// Performs an upsert of the `body` (in JSON) into the table.
+    ///
+    /// # Note
+    ///
+    /// This merges duplicates by default. Ignoring duplicates is possible via
+    /// PostgREST, but is currently unsupported.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// #[derive(serde::Serialize)]
+    /// struct MyStruct {}
+    ///
+    /// let my_serializable_struct = MyStruct {};
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .upsert(&my_serializable_struct)?;
+    /// ```
+    #[cfg(feature = "serde")]
+    pub fn upsert<T>(self, body: &T) -> serde_json::Result<Self>
+    where
+        T: serde::Serialize,
+    {
+        Ok(self.upsert_impl(serde_json::to_string(body)?))
+    }
+    
+    fn upsert_impl(mut self, body: String) -> Self {
         self.method = Method::POST;
         self.headers.insert(
             "Prefer",
             HeaderValue::from_static("return=representation,resolution=merge-duplicates"),
         );
-        self.body = Some(body.into());
+        self.body = Some(body);
         self
     }
 
