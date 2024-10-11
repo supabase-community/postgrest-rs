@@ -75,6 +75,7 @@ async fn relational_join() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(not(feature = "serde"))]
 async fn insert() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL);
     let resp = client
@@ -90,6 +91,7 @@ async fn insert() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(not(feature = "serde"))]
 async fn upsert() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL);
     let resp = client
@@ -110,6 +112,7 @@ async fn upsert() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(not(feature = "serde"))]
 async fn upsert_existing() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL);
     let resp = client
@@ -128,6 +131,7 @@ async fn upsert_existing() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(not(feature = "serde"))]
 async fn upsert_nonexisting() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL);
     let resp = client
@@ -145,6 +149,7 @@ async fn upsert_nonexisting() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(not(feature = "serde"))]
 async fn update() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL);
     let resp = client

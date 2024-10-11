@@ -37,6 +37,7 @@ async fn read_other_schema() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(not(feature = "serde"))]
 async fn write_other_schema() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL);
     let resp = client
@@ -81,6 +82,7 @@ async fn read_nonexisting_schema() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+#[cfg(not(feature = "serde"))]
 async fn write_nonexisting_schema() -> Result<(), Box<dyn Error>> {
     let client = Postgrest::new(REST_URL).schema("private");
     let resp = client

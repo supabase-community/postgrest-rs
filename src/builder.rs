@@ -787,6 +787,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "serde"))]
     fn upsert_assert_prefer_header() {
         let client = Client::new();
         let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client).upsert("ignored");
