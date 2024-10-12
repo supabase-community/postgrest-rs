@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Build the stack
-        run: docker-compose -f ./tests/db/docker-compose.yml up -d
+        run: docker compose -f ./tests/db/docker-compose.yml up -d
 
       - name: Set up toolchain
         uses: actions-rs/toolchain@v1

@@ -1,6 +1,7 @@
+pub use reqwest::Error;
 use reqwest::{
     header::{HeaderMap, HeaderValue},
-    Client, Error, Method, Response,
+    Client, Method, Response,
 };
 
 /// QueryBuilder struct
