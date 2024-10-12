@@ -420,14 +420,44 @@ impl Builder {
     ///     .insert(r#"[{ "username": "soedirgo", "status": "online" },
     ///                 { "username": "jose", "status": "offline" }]"#);
     /// ```
-    pub fn insert<T>(mut self, body: T) -> Self
+    #[cfg(not(feature = "serde"))]
+    pub fn insert<T>(self, body: T) -> Self
     where
         T: Into<String>,
     {
+        self.insert_impl(body.into())
+    }
+
+    /// Performs an INSERT of the `body` (in JSON) into the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// #[derive(serde::Serialize)]
+    /// struct MyStruct {}
+    ///
+    /// let my_serializable_struct = MyStruct {};
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .insert(&my_serializable_struct).unwrap();
+    /// ```
+    #[cfg(feature = "serde")]
+    pub fn insert<T>(self, body: &T) -> serde_json::Result<Self>
+    where
+        T: serde::Serialize,
+    {
+        Ok(self.insert_impl(serde_json::to_string(body)?))
+    }
+
+    fn insert_impl(mut self, body: String) -> Self {
         self.method = Method::POST;
         self.headers
             .insert("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.into());
+        self.body = Some(body);
         self
     }
 
@@ -449,16 +479,51 @@ impl Builder {
     ///     .upsert(r#"[{ "username": "soedirgo", "status": "online" },
     ///                 { "username": "jose", "status": "offline" }]"#);
     /// ```
-    pub fn upsert<T>(mut self, body: T) -> Self
+    #[cfg(not(feature = "serde"))]
+    pub fn upsert<T>(self, body: T) -> Self
     where
         T: Into<String>,
     {
+        self.upsert_impl(body.into())
+    }
+
+    /// Performs an upsert of the `body` (in JSON) into the table.
+    ///
+    /// # Note
+    ///
+    /// This merges duplicates by default. Ignoring duplicates is possible via
+    /// PostgREST, but is currently unsupported.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// #[derive(serde::Serialize)]
+    /// struct MyStruct {}
+    ///
+    /// let my_serializable_struct = MyStruct {};
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .upsert(&my_serializable_struct).unwrap();
+    /// ```
+    #[cfg(feature = "serde")]
+    pub fn upsert<T>(self, body: &T) -> serde_json::Result<Self>
+    where
+        T: serde::Serialize,
+    {
+        Ok(self.upsert_impl(serde_json::to_string(body)?))
+    }
+    
+    fn upsert_impl(mut self, body: String) -> Self {
         self.method = Method::POST;
         self.headers.insert(
             "Prefer",
             HeaderValue::from_static("return=representation,resolution=merge-duplicates"),
         );
-        self.body = Some(body.into());
+        self.body = Some(body);
         self
     }
 
@@ -479,11 +544,23 @@ impl Builder {
     /// let client = Postgrest::new("https://your.postgrest.endpoint");
     /// // Suppose `users` are keyed an SERIAL primary key,
     /// // but have a unique index on `username`.
-    /// client
-    ///     .from("users")
-    ///     .upsert(r#"[{ "username": "soedirgo", "status": "online" },
-    ///                 { "username": "jose", "status": "offline" }]"#)
-    ///     .on_conflict("username");
+    #[cfg_attr(not(feature = "serde"), doc = r##"
+     client
+         .from("users")
+         .upsert(r#"[{ "username": "soedirgo", "status": "online" },
+                     { "username": "jose", "status": "offline" }]"#)
+         .on_conflict("username");
+    "##)]
+    #[cfg_attr(feature = "serde", doc = r##"
+     #[derive(serde::Serialize)]
+     struct MyStruct {}
+    
+     let my_serializable_struct = MyStruct {};
+    
+     client
+         .from("users")
+         .upsert(&my_serializable_struct).unwrap();
+    "##)]
     /// ```
     pub fn on_conflict<T>(mut self, columns: T) -> Self
     where
@@ -507,14 +584,44 @@ impl Builder {
     ///     .eq("username", "soedirgo")
     ///     .update(r#"{ "status": "offline" }"#);
     /// ```
-    pub fn update<T>(mut self, body: T) -> Self
+    #[cfg(not(feature = "serde"))]
+    pub fn update<T>(self, body: T) -> Self
     where
         T: Into<String>,
     {
+        self.update_impl(body.into())
+    }
+
+    /// Performs an UPDATE using the `body` (in JSON) on the table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    /// 
+    /// #[derive(serde::Serialize)]
+    /// struct MyStruct {}
+    ///
+    /// let my_serializable_struct = MyStruct {};
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .eq("username", "soedirgo")
+    ///     .update(&my_serializable_struct).unwrap();
+    /// ```
+    #[cfg(feature = "serde")]
+    pub fn update<T>(self, body: &T) -> serde_json::Result<Self>
+    where
+        T: serde::Serialize {
+        Ok(self.update_impl(serde_json::to_string(body)?))
+    }
+
+    fn update_impl(mut self, body: String) -> Self {
         self.method = Method::PATCH;
         self.headers
             .insert("Prefer", HeaderValue::from_static("return=representation"));
-        self.body = Some(body.into());
+        self.body = Some(body);
         self
     }
 
@@ -693,9 +800,23 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "serde"))]
     fn upsert_assert_prefer_header() {
         let client = Client::new();
         let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client).upsert("ignored");
+        assert_eq!(
+            builder.headers.get("Prefer").unwrap(),
+            HeaderValue::from_static("return=representation,resolution=merge-duplicates")
+        );
+    }
+    
+    #[test]
+    #[cfg(feature = "serde")]
+    fn upsert_assert_prefer_header_serde() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .upsert(&())
+            .unwrap();
         assert_eq!(
             builder.headers.get("Prefer").unwrap(),
             HeaderValue::from_static("return=representation,resolution=merge-duplicates")

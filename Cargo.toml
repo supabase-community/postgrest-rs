@@ -13,7 +13,13 @@ edition = "2021"
 
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+serde_json = { version = "1.0.128", optional = true }
+serde = { version = "1.0.210", optional = true }
 
 [dev-dependencies]
 json = "0.12"
 tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0.210", features = ["derive"] }
+
+[features]
+serde = ["dep:serde_json", "dep:serde"]
