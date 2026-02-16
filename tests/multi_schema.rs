@@ -5,11 +5,21 @@ use postgrest::Postgrest;
 
 use std::error::Error;
 
-const REST_URL: &str = "http://localhost:3000";
+const DEFAULT_REST_URL: &str = "http://localhost:3000";
+
+fn create_client() -> Postgrest {
+    let url = std::env::var("REST_URL").unwrap_or_else(|_| DEFAULT_REST_URL.to_string());
+    let client = Postgrest::new(&url);
+    if let Ok(key) = std::env::var("APIKEY") {
+        client.insert_header("apikey", &key)
+    } else {
+        client
+    }
+}
 
 #[tokio::test]
 async fn read_other_schema() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("users")
         .select("username")
@@ -21,7 +31,7 @@ async fn read_other_schema() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(body, array![]);
 
-    let other_client = Postgrest::new(REST_URL).schema("personal");
+    let other_client = create_client().schema("personal");
     let other_resp = other_client
         .from("users")
         .select("username")
@@ -38,7 +48,7 @@ async fn read_other_schema() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn write_other_schema() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("users")
         .select("status")
@@ -50,7 +60,7 @@ async fn write_other_schema() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(body[0]["status"], "ONLINE");
 
-    let other_client = Postgrest::new(REST_URL).schema("personal");
+    let other_client = create_client().schema("personal");
     let other_resp = other_client
         .from("users")
         .update("{\"status\": \"OFFLINE\"}")
@@ -67,14 +77,14 @@ async fn write_other_schema() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn read_nonexisting_schema() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL).schema("private");
+    let client = create_client().schema("private");
     let resp = client.from("channels").select("*").execute().await?;
     let body = resp.text().await?;
     let body = json::parse(&body)?;
 
     assert_eq!(
         body["message"],
-        "The schema must be one of the following: public, personal"
+        "Invalid schema: private"
     );
 
     Ok(())
@@ -82,7 +92,7 @@ async fn read_nonexisting_schema() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn write_nonexisting_schema() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL).schema("private");
+    let client = create_client().schema("private");
     let resp = client
         .from("channels")
         .update("{\"slug\": \"private\"}")
@@ -94,7 +104,7 @@ async fn write_nonexisting_schema() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(
         body["message"],
-        "The schema must be one of the following: public, personal"
+        "Invalid schema: private"
     );
 
     Ok(())
@@ -102,7 +112,7 @@ async fn write_nonexisting_schema() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn other_schema_rpc() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL).schema("personal");
+    let client = create_client().schema("personal");
     let resp = client
         .rpc("get_status", "{\"name_param\": \"leroyjenkins\"}")
         .execute()
@@ -117,7 +127,7 @@ async fn other_schema_rpc() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn nonexisting_rpc_in_schema() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL).schema("personal");
+    let client = create_client().schema("personal");
     let resp = client
         .rpc("nonexistent_procedure", "{\"param\": 0}")
         .execute()
@@ -135,7 +145,7 @@ async fn nonexisting_rpc_in_schema() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn nonexisting_schema_for_rpc() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL).schema("private");
+    let client = create_client().schema("private");
     let resp = client
         .rpc("get_status", "{\"name_param\": \"leroyjenkins\"}")
         .execute()
@@ -145,7 +155,7 @@ async fn nonexisting_schema_for_rpc() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(
         body["message"],
-        "The schema must be one of the following: public, personal"
+        "Invalid schema: private"
     );
 
     Ok(())

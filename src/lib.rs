@@ -78,6 +78,8 @@ mod builder;
 mod filter;
 
 pub use builder::Builder;
+#[cfg(feature = "typed")]
+pub use builder::PostgrestError;
 use reqwest::header::{HeaderMap, HeaderValue, IntoHeaderName};
 use reqwest::Client;
 

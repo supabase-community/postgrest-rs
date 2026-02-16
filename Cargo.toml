@@ -11,9 +11,16 @@ keywords = ["postgres", "postgrest", "rest", "api"]
 categories = ["development-tools"]
 edition = "2021"
 
+[features]
+typed = ["serde", "serde_json"]
+
 [dependencies]
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+serde = { version = "1.0", optional = true, features = ["derive"] }
+serde_json = { version = "1.0", optional = true }
 
 [dev-dependencies]
 json = "0.12"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }

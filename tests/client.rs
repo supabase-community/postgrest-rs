@@ -2,11 +2,21 @@ use postgrest::Postgrest;
 
 use std::error::Error;
 
-const REST_URL: &str = "http://localhost:3000";
+const DEFAULT_REST_URL: &str = "http://localhost:3000";
+
+fn create_client() -> Postgrest {
+    let url = std::env::var("REST_URL").unwrap_or_else(|_| DEFAULT_REST_URL.to_string());
+    let client = Postgrest::new(&url);
+    if let Ok(key) = std::env::var("APIKEY") {
+        client.insert_header("apikey", &key)
+    } else {
+        client
+    }
+}
 
 #[tokio::test]
 async fn basic_data() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("users")
         .select("username")
@@ -23,7 +33,7 @@ async fn basic_data() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn special_characters_eq() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("users")
         .select("username")
@@ -40,7 +50,7 @@ async fn special_characters_eq() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn special_characters_neq() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("users")
         .select("username")
@@ -58,7 +68,7 @@ async fn special_characters_neq() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn relational_join() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("channels")
         .select("slug, messages(message)")
@@ -76,7 +86,7 @@ async fn relational_join() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn insert() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("messages")
         .insert(r#"[{"message": "Test message 0", "channel_id": 1, "username": "kiwicopple"}]"#)
@@ -91,7 +101,7 @@ async fn insert() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn upsert() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("users")
         .upsert(
@@ -111,7 +121,7 @@ async fn upsert() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn upsert_existing() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("users")
         .upsert(r#"{"username": "dragarcia", "status": "ONLINE"}"#)
@@ -129,7 +139,7 @@ async fn upsert_existing() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn upsert_nonexisting() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("users")
         .upsert(r#"{"username": "supabot3", "status": "ONLINE"}"#)
@@ -146,7 +156,7 @@ async fn upsert_nonexisting() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn update() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("users")
         .eq("status", "ONLINE")
@@ -165,7 +175,7 @@ async fn update() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn delete() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .from("messages")
         .neq("username", "supabot")
@@ -181,7 +191,7 @@ async fn delete() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn rpc() -> Result<(), Box<dyn Error>> {
-    let client = Postgrest::new(REST_URL);
+    let client = create_client();
     let resp = client
         .rpc("get_status", r#"{"name_param": "leroyjenkins"}"#)
         .execute()

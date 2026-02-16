@@ -5,192 +5,238 @@
 [![API](https://docs.rs/postgrest/badge.svg)](https://docs.rs/postgrest)
 [![License: Apache-2.0 OR MIT](https://img.shields.io/crates/l/postgrest.svg)](#license)
 
-[PostgREST](https://postgrest.org/) client-side library 🦀. This library provides an ORM interface to PostgREST.
+[PostgREST](https://postgrest.org/) client-side library for Rust. This library provides an ORM-like interface to PostgREST.
+
+## Installation
+
+```bash
+cargo add postgrest
+```
 
 ## Usage
 
-Add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-postgrest = "1.0"
-```
-
-Simple example:
+### Create a Client
 
 ```rust
 use postgrest::Postgrest;
 
-let client = Postgrest::new("https://your.postgrest.endpoint");
+let client = Postgrest::new("https://your.postgrest.endpoint")
+    .insert_header("apikey", "your-api-key");
+```
+
+### Select
+
+```rust
 let resp = client
-    .from("your_table")
+    .from("users")
+    .select("id,name,email")
+    .execute()
+    .await?;
+
+let body = resp.text().await?;
+```
+
+### Insert
+
+```rust
+let resp = client
+    .from("users")
+    .insert(r#"[{"name": "Alice", "email": "alice@example.com"}]"#)
+    .execute()
+    .await?;
+```
+
+### Update
+
+```rust
+let resp = client
+    .from("users")
+    .eq("id", "1")
+    .update(r#"{"name": "Bob"}"#)
+    .execute()
+    .await?;
+```
+
+### Upsert
+
+```rust
+let resp = client
+    .from("users")
+    .upsert(r#"[{"id": 1, "name": "Bob", "email": "bob@example.com"}]"#)
+    .execute()
+    .await?;
+```
+
+### Delete
+
+```rust
+let resp = client
+    .from("users")
+    .eq("id", "1")
+    .delete()
+    .execute()
+    .await?;
+```
+
+### Stored Procedures (RPC)
+
+```rust
+let resp = client
+    .rpc("add", r#"{"a": 1, "b": 2}"#)
+    .execute()
+    .await?;
+```
+
+### Authentication
+
+```rust
+// Set a JWT on individual requests
+let resp = client
+    .from("users")
+    .auth("your-jwt-token")
     .select("*")
     .execute()
     .await?;
-let body = resp
-    .text()
-    .await?;
+
+// Or set default headers on the client
+let client = Postgrest::new("https://your.postgrest.endpoint")
+    .insert_header("apikey", "your-api-key")
+    .insert_header("Authorization", "Bearer your-jwt-token");
 ```
 
-Simple example with JWT auth
-
-```rust
-use postgrest::Postgrest;
-
-let client = Postgrest::new("https://your.postgrest.endpoint");
-let resp = client
-    .from("your_table")
-    .auth("VerySensitiveJWTValueAsStringOrStr")
-    .select("*")
-    .execute()
-    .await?;
-let body = resp
-    .text()
-    .await?;
-```
-
-Simplified example using a custom header (e.g. for API gateway authentication with Supabase).
-
-```rust
-use postgrest::Postgrest;
-
-let client = Postgrest::new("https://your.supabase.endpoint/rest/v1")
-    .insert_header("apikey", "ExampleAPIKeyValue"); // EXAMPLE ONLY!
-// Don't actually hard code this value, that's really bad. Use environment
-// variables like with the dotenv(https://crates.io/crates/dotenv) crate to inject
-let resp = client
-    .from("your_table")
-    .select("*")
-    .execute()
-    .await?;
-let body = resp
-    .text()
-    .await?;
-```
-
-**Secure** example with authenticated API gateway using the dotenv crate to correctly retrieve sensitive values.
-
-```rust
-use postgrest::Postgrest;
-use dotenv;
-
-dotenv::dotenv().ok();
-
-let client = Postgrest::new("https://your.supabase.endpoint/rest/v1")
-    .insert_header(
-        "apikey",
-        dotenv::var("SUPABASE_PUBLIC_API_KEY").unwrap())
-let resp = client
-    .from("your_table")
-    .select("*")
-    .execute()
-    .await?;
-let body = resp
-    .text()
-    .await?;
-```
-
-if you have RLS enabled you're required to add an extra header for this libary to  function correctly.
-
-```rust
-use postgrest::Postgrest;
-use dotenv;
-
-dotenv::dotenv().ok();
-
-let client = Postgrest::new("https://your.supabase.endpoint/rest/v1/")
-    .insert_header(
-        "apikey",
-        dotenv::var("SUPABASE_PUBLIC_API_KEY").unwrap())
-    .insert_header("Authorization", format!("Bearer {}", SERVICE_KEY));
-
-let resp = client
-    .from("your_table")
-    .select("*")
-    .execute()
-    .await?;
-let body = resp
-    .text()
-    .await?;
-```
-
-### Building Queries
-
-These examples assume you've already initialized the client.  The methods `.from()` and `.rpc()` initalizes the query builder inside the client.
-
-Using filters:
-
-```rust
-let resp = client
-    .from("your_table")
-    .eq("country", "Germany")
-    .gte("id", "20")
-    .select("*")
-    .execute()
-    .await?;
-```
-
-Updating a table:
-
-```rust
-let resp = client
-    .from("your_table")
-    .eq("username", "soedirgo")
-    .update("{\"organization\": \"supabase\"}")
-    .execute()
-    .await?;
-```
-
-Executing stored procedures:
-
-```rust
-let resp = client
-    .rpc("add", "{\"a\": 1, \"b\": 2}")
-    .execute()
-    .await?;
-```
-
-_Not enough filters_:
+### Filters
 
 ```rust
 let resp = client
     .from("countries")
-    .eq("name", "New Zealand")                        // You can filter for equality...
-    .gt("id", "20")
-    .lt("id", "20")
-    .gte("id", "20")
-    .lte("id", "20")
-    .like("name", "%United%")                         // ...do pattern matching...
-    .ilike("name", "%United%")
-    .is("name", "null")
-    .in_("name", vec!["China", "France"])
-    .neq("name", "China")
-    .fts("phrase", "The Fat Cats", Some("english"))   // ...do full text search...
-    .plfts("phrase", "The Fat Cats", None)
-    .phfts("phrase", "The Fat Cats", Some("english"))
-    .wfts("phrase", "The Fat Cats", None)
-    .cs("countries", "(10,20)")
-    .cd("countries", "(10,20)")
-    .ov("population_range", "(100,500)")
-    .sl("population_range", (100, 500))               // ...and range operations!
-    .sr("population_range", (100, 500))               // Find out more about the filters at:
-    .nxl("population_range", (100, 500))              // https://postgrest.org/en/stable/api.html#operators
-    .nxr("population_range", (100, 500))
-    .adj("population_range", (100, 500))
-    .select("*")
+    .select("name,population")
+    .eq("continent", "Europe")
+    .gte("population", "1000000")
+    .order("population.desc")
+    .limit(10)
     .execute()
     .await?;
 ```
 
-Check out the [API docs](https://docs.rs/postgrest) for more info!
+| Method | Operator | Description |
+|--------|----------|-------------|
+| `eq` | `=` | Equal |
+| `neq` | `!=` | Not equal |
+| `gt` | `>` | Greater than |
+| `gte` | `>=` | Greater than or equal |
+| `lt` | `<` | Less than |
+| `lte` | `<=` | Less than or equal |
+| `like` | `LIKE` | Pattern match (case-sensitive) |
+| `ilike` | `ILIKE` | Pattern match (case-insensitive) |
+| `is` | `IS` | Null / boolean check |
+| `in_` | `IN` | One of a list of values |
+| `fts` | `@@` | Full-text search |
+| `plfts` | `@@` | Plain-to-tsquery |
+| `phfts` | `@@` | Phrase-to-tsquery |
+| `wfts` | `@@` | Web-search-to-tsquery |
+| `cs` | `@>` | Contains |
+| `cd` | `<@` | Contained by |
+| `ov` | `&&` | Overlaps |
+| `sl` | `<<` | Strictly left of |
+| `sr` | `>>` | Strictly right of |
+| `nxl` | `&<` | Does not extend left |
+| `nxr` | `&>` | Does not extend right |
+| `adj` | `-\|-` | Adjacent |
+
+### CSV Response
+
+Request results as CSV instead of JSON:
+
+```rust
+let resp = client
+    .from("users")
+    .select("*")
+    .csv()
+    .execute()
+    .await?;
+
+let csv_text = resp.text().await?;
+```
+
+### GeoJSON Response
+
+Request results as GeoJSON (requires a PostGIS geometry/geography column):
+
+```rust
+let resp = client
+    .from("locations")
+    .select("*")
+    .geojson()
+    .execute()
+    .await?;
+
+let geojson = resp.text().await?;
+```
+
+### Explain (Query Plans)
+
+Retrieve the execution plan for a query:
+
+```rust
+// Basic explain
+let resp = client
+    .from("users")
+    .select("*")
+    .explain()
+    .execute()
+    .await?;
+
+// With options (analyze, verbose, format)
+let resp = client
+    .from("users")
+    .select("*")
+    .explain_with_options(true, true, "json")
+    .execute()
+    .await?;
+```
+
+### Typed Responses
+
+Enable the `typed` feature to deserialize responses directly into Rust structs:
+
+```toml
+[dependencies]
+postgrest = { version = "1.0", features = ["typed"] }
+```
+
+```rust
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct User {
+    id: i64,
+    name: String,
+    email: String,
+}
+
+let users: Vec<User> = client
+    .from("users")
+    .select("id,name,email")
+    .execute_and_parse::<User>()
+    .await?;
+```
+
+## Features
+
+- [x] Select, Insert, Update, Upsert, Delete
+- [x] Stored procedures (RPC)
+- [x] All PostgREST filter operators
+- [x] Authentication (`auth()`, `insert_header()`)
+- [x] CSV response format
+- [x] GeoJSON response format
+- [x] Query plan explain / explain with options
+- [x] Typed deserialization (`typed` feature)
+- [x] Ordering, limiting, pagination
+- [x] Resource embedding (foreign table joins)
 
 ## Contributing
 
-Contributions are welcome! There might be some features you want in, or some
-unclear documentation, or a bug—either way, feel free to create an issue, and
-we'll work it out!
-
-Boring stuff below.
+Contributions are welcome! Feel free to create an issue or submit a pull request.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
@@ -200,12 +246,8 @@ dual licensed as below, without any additional terms or conditions.
 
 Licensed under either of
 
--   Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
-    https://www.apache.org/licenses/LICENSE-2.0)
--   MIT license ([LICENSE-MIT](LICENSE-MIT) or https://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
+  https://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or https://opensource.org/licenses/MIT)
 
 at your option.
-
----
-
-![](https://camo.githubusercontent.com/f266fbf746ee25b75480696176e356b84688f1e9/68747470733a2f2f67697463646e2e78797a2f7265706f2f73757061626173652f6d6f6e6f7265706f2f6d61737465722f7765622f7374617469632f77617463682d7265706f2e676966)

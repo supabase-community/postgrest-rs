@@ -4,6 +4,56 @@ use reqwest::{
     Client, Method, Response,
 };
 
+#[cfg(feature = "typed")]
+use serde::de::DeserializeOwned;
+
+/// Error type for typed PostgREST operations.
+///
+/// Wraps both network errors ([`reqwest::Error`]) and deserialization errors
+/// ([`serde_json::Error`]). Only available with the `typed` feature.
+#[cfg(feature = "typed")]
+#[derive(Debug)]
+pub enum PostgrestError {
+    /// An HTTP or network error from reqwest.
+    RequestError(reqwest::Error),
+    /// A JSON deserialization error.
+    DeserializeError(serde_json::Error),
+}
+
+#[cfg(feature = "typed")]
+impl std::fmt::Display for PostgrestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PostgrestError::RequestError(e) => write!(f, "Request error: {}", e),
+            PostgrestError::DeserializeError(e) => write!(f, "Deserialization error: {}", e),
+        }
+    }
+}
+
+#[cfg(feature = "typed")]
+impl std::error::Error for PostgrestError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            PostgrestError::RequestError(e) => Some(e),
+            PostgrestError::DeserializeError(e) => Some(e),
+        }
+    }
+}
+
+#[cfg(feature = "typed")]
+impl From<reqwest::Error> for PostgrestError {
+    fn from(err: reqwest::Error) -> Self {
+        PostgrestError::RequestError(err)
+    }
+}
+
+#[cfg(feature = "typed")]
+impl From<serde_json::Error> for PostgrestError {
+    fn from(err: serde_json::Error) -> Self {
+        PostgrestError::DeserializeError(err)
+    }
+}
+
 /// QueryBuilder struct
 #[derive(Clone, Debug)]
 pub struct Builder {
@@ -20,7 +70,6 @@ pub struct Builder {
     client: Client,
 }
 
-// TODO: Test Unicode support
 impl Builder {
     /// Creates a new `Builder` with the specified `schema`.
     pub fn new<T>(url: T, schema: Option<String>, headers: HeaderMap, client: Client) -> Self
@@ -407,6 +456,123 @@ impl Builder {
         self
     }
 
+    /// Returns the result as CSV.
+    ///
+    /// Sets `Accept: text/csv` so PostgREST returns comma-separated values
+    /// instead of JSON.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .csv();
+    /// ```
+    pub fn csv(mut self) -> Self {
+        self.headers
+            .insert("Accept", HeaderValue::from_static("text/csv"));
+        self
+    }
+
+    /// Returns the result as GeoJSON.
+    ///
+    /// Sets `Accept: application/geo+json` so PostgREST returns a GeoJSON
+    /// FeatureCollection. Requires PostgREST 12+ and a table with a geometry
+    /// column.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("spatial_data")
+    ///     .select("*")
+    ///     .geojson();
+    /// ```
+    pub fn geojson(mut self) -> Self {
+        self.headers
+            .insert("Accept", HeaderValue::from_static("application/geo+json"));
+        self
+    }
+
+    /// Returns the query execution plan in JSON format.
+    ///
+    /// Sets `Accept: application/vnd.pgrst.plan+json` so PostgREST returns
+    /// the PostgreSQL `EXPLAIN` output instead of the query result.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .explain();
+    /// ```
+    pub fn explain(mut self) -> Self {
+        self.headers.insert(
+            "Accept",
+            HeaderValue::from_static("application/vnd.pgrst.plan+json"),
+        );
+        self
+    }
+
+    /// Returns the query execution plan with configurable options and format.
+    ///
+    /// # Arguments
+    ///
+    /// * `analyze` - Execute the query and show actual run times and row counts.
+    /// * `verbose` - Show additional detail about the plan.
+    /// * `format` - Output format: `"text"`, `"json"`, `"xml"`, or `"yaml"`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use postgrest::Postgrest;
+    ///
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// client
+    ///     .from("users")
+    ///     .select("*")
+    ///     .explain_with_options(true, false, "json");
+    /// ```
+    pub fn explain_with_options(
+        mut self,
+        analyze: bool,
+        verbose: bool,
+        format: &str,
+    ) -> Self {
+        let mut options = Vec::new();
+        if analyze {
+            options.push("analyze");
+        }
+        if verbose {
+            options.push("verbose");
+        }
+
+        let accept = if options.is_empty() {
+            format!("application/vnd.pgrst.plan+{}", format)
+        } else {
+            format!(
+                "application/vnd.pgrst.plan+{}; options={}",
+                format,
+                options.join("|")
+            )
+        };
+
+        self.headers
+            .insert("Accept", HeaderValue::from_str(&accept).unwrap());
+        self
+    }
+
     /// Performs an INSERT of the `body` (in JSON) into the table.
     ///
     /// # Example
@@ -578,6 +744,45 @@ impl Builder {
     pub async fn execute(self) -> Result<Response, Error> {
         self.build().send().await
     }
+
+    /// Executes the PostgREST request and deserializes the JSON response body
+    /// into the specified type.
+    ///
+    /// This is a convenience method that combines [`execute`](Builder::execute)
+    /// with JSON deserialization. Requires the `typed` feature.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use postgrest::Postgrest;
+    /// use serde::Deserialize;
+    ///
+    /// #[derive(Deserialize)]
+    /// struct User {
+    ///     id: i64,
+    ///     username: String,
+    /// }
+    ///
+    /// # async fn run() -> Result<(), postgrest::PostgrestError> {
+    /// let client = Postgrest::new("https://your.postgrest.endpoint");
+    /// let users: Vec<User> = client
+    ///     .from("users")
+    ///     .select("id,username")
+    ///     .execute_and_parse()
+    ///     .await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "typed")]
+    pub async fn execute_and_parse<T>(self) -> Result<Vec<T>, PostgrestError>
+    where
+        T: DeserializeOwned,
+    {
+        let response = self.build().send().await?;
+        let body = response.text().await?;
+        let parsed: Vec<T> = serde_json::from_str(&body)?;
+        Ok(parsed)
+    }
 }
 
 #[cfg(test)]
@@ -734,5 +939,129 @@ mod tests {
         assert!(queries.contains(&("channel_id".into(), "gte.1".into())));
 
         Ok(())
+    }
+
+    #[test]
+    fn csv_assert_accept_header() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client).csv();
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            HeaderValue::from_static("text/csv")
+        );
+    }
+
+    #[test]
+    fn geojson_assert_accept_header() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client).geojson();
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            HeaderValue::from_static("application/geo+json")
+        );
+    }
+
+    #[test]
+    fn explain_assert_accept_header() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client).explain();
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            HeaderValue::from_static("application/vnd.pgrst.plan+json")
+        );
+    }
+
+    #[test]
+    fn explain_with_options_analyze_verbose() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .explain_with_options(true, true, "json");
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            "application/vnd.pgrst.plan+json; options=analyze|verbose"
+        );
+    }
+
+    #[test]
+    fn explain_with_options_text_format() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .explain_with_options(false, false, "text");
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            "application/vnd.pgrst.plan+text"
+        );
+    }
+
+    #[test]
+    fn explain_with_options_analyze_only() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .explain_with_options(true, false, "yaml");
+        assert_eq!(
+            builder.headers.get("Accept").unwrap(),
+            "application/vnd.pgrst.plan+yaml; options=analyze"
+        );
+    }
+
+    // Unicode support tests
+    #[test]
+    fn unicode_filter_value() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .eq("name", "日本語");
+        assert!(builder
+            .queries
+            .contains(&("name".into(), "eq.日本語".into())));
+    }
+
+    #[test]
+    fn unicode_column_name() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .eq("名前", "test");
+        assert!(builder
+            .queries
+            .contains(&("名前".into(), "eq.test".into())));
+    }
+
+    #[test]
+    fn unicode_select_columns() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .select("名前,住所");
+        assert!(builder
+            .queries
+            .contains(&("select".into(), "名前,住所".into())));
+    }
+
+    #[test]
+    fn unicode_in_like_pattern() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .like("city", "%München%");
+        assert!(builder
+            .queries
+            .contains(&("city".into(), "like.*München*".into())));
+    }
+
+    #[test]
+    fn unicode_emoji_value() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .eq("status", "✅ done");
+        assert!(builder
+            .queries
+            .contains(&("status".into(), "eq.✅ done".into())));
+    }
+
+    #[test]
+    fn unicode_in_order() {
+        let client = Client::new();
+        let builder = Builder::new(TABLE_URL, None, HeaderMap::new(), client)
+            .order("名前.asc");
+        assert!(builder
+            .queries
+            .contains(&("order".into(), "名前.asc".into())));
     }
 }
